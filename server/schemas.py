@@ -18,6 +18,7 @@ class TaskResponse(BaseModel):
     status: TaskStatus
     message: Optional[str] = None
     progress: float = 0.0
+    last_played_chunk_index: int = 0
     file_path: Optional[str] = None
     filename: Optional[str] = None
     duration: Optional[float] = None

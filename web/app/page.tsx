@@ -13,8 +13,15 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { Upload, Loader2, Mic, Download, FileText, FileJson, FileType, Trash2 } from "lucide-react";
+import axios from "axios";
 
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -25,6 +32,8 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchTasks();
+    const interval = setInterval(fetchTasks, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchTasks = async () => {
@@ -86,7 +95,11 @@ export default function HomePage() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleString(undefined, {
+    const hasTimezone = /[zZ]|[+\-]\d{2}:?\d{2}$/.test(dateString);
+    const normalized = hasTimezone ? dateString : `${dateString}Z`;
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleString(undefined, {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -98,7 +111,9 @@ export default function HomePage() {
   const handleDownloadAudio = (task: Task) => {
     if (!task.file_path) return;
     const filename = task.file_path.split(/[\\/]/).pop();
-    const url = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/uploads/${filename}`;
+    let baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    baseUrl = baseUrl.replace(/\/api\/?$/, "");
+    const url = `${baseUrl}/uploads/${filename}`;
     window.open(url, "_blank");
   };
 
@@ -137,8 +152,13 @@ export default function HomePage() {
       toast.success("Task deleted successfully");
       fetchTasks();
     } catch (error) {
-      console.error("Failed to delete task", error);
-      toast.error("Failed to delete task");
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        toast.success("Task already deleted");
+        fetchTasks();
+      } else {
+        console.error("Failed to delete task", error);
+        toast.error("Failed to delete task");
+      }
     }
   };
 
@@ -215,7 +235,13 @@ export default function HomePage() {
                       </td>
                       <td className="p-4 align-middle text-center">{formatDuration(task.duration)}</td>
                       <td className="p-4 align-middle text-center">{formatDate(task.created_at)}</td>
-                      <td className="p-4 align-middle capitalize text-center">{task.status}</td>
+                      <td className="p-4 align-middle text-center">
+                        {task.status === "failed" ? (
+                          <span className="text-red-500 font-bold">Error</span>
+                        ) : (
+                          <span className="capitalize">{task.status}</span>
+                        )}
+                      </td>
                       <td className="p-4 align-middle text-center">
                         <div className="flex justify-center items-center gap-2">
                           <Button
@@ -260,39 +286,23 @@ export default function HomePage() {
 }
 
 function SubtitleDownloadButton({ task, onDownload }: { task: Task, onDownload: (task: Task, format: 'srt' | 'json') => void }) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    return (
-        <div className="relative">
-            <Button
-                variant="ghost"
-                size="icon"
-                title="Download Subtitle"
-                onClick={() => setIsOpen(!isOpen)}
-            >
-                <FileText className="h-4 w-4" />
-            </Button>
-            {isOpen && (
-                <div className="absolute right-0 top-full mt-1 z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-80 zoom-in-95">
-                    <div 
-                        className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                        onClick={() => { onDownload(task, 'srt'); setIsOpen(false); }}
-                    >
-                        <FileType className="mr-2 h-4 w-4" />
-                        <span>SRT</span>
-                    </div>
-                    <div 
-                        className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                        onClick={() => { onDownload(task, 'json'); setIsOpen(false); }}
-                    >
-                        <FileJson className="mr-2 h-4 w-4" />
-                        <span>JSON</span>
-                    </div>
-                </div>
-            )}
-            {isOpen && (
-                <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-            )}
-        </div>
-    )
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" title="Download Subtitle">
+          <FileText className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => onDownload(task, "srt")}>
+          <FileType className="mr-2 h-4 w-4" />
+          <span>SRT</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onDownload(task, "json")}>
+          <FileJson className="mr-2 h-4 w-4" />
+          <span>JSON</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }

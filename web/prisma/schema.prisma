@@ -1,13 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 model Task {
@@ -17,18 +14,20 @@ model Task {
   filePath  String
   duration  Float?
   progress  Float    @default(0.0)
+  lastPlayedChunkIndex Int @default(0)
   message   String?
-  result    String?  // JSON string of segments
+  result    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   recordings PracticeRecording[]
 }
 
 model PracticeRecording {
   id           String   @id @default(uuid())
   taskId       String
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   segmentIndex Int
   filePath     String
   createdAt    DateTime @default(now())
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }

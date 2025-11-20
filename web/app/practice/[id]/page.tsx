@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, Task, Segment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Play, Pause, Mic, ChevronLeft, ChevronRight, Volume2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -36,8 +37,12 @@ export default function PracticePage() {
           const result = await api.getResult(id);
           setSegments(result.segments);
           
-          // Load existing recording for first segment if any
-          loadRecording(0);
+          // Load last played chunk or 0
+          const initialIndex = taskData.last_played_chunk_index || 0;
+          setCurrentIndex(initialIndex);
+          
+          // Load existing recording for initial segment if any
+          loadRecording(initialIndex);
         } else {
           toast.error("Task is not ready for practice");
           router.push("/");
@@ -60,7 +65,8 @@ export default function PracticePage() {
       
       if (segmentRecordings.length > 0) {
         const filename = segmentRecordings[0].filePath;
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+        let baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+        baseUrl = baseUrl.replace(/\/api\/?$/, "");
         setUserRecordingUrl(`${baseUrl}/user_recordings/${filename}`);
       } else {
         setUserRecordingUrl(null);
@@ -73,7 +79,8 @@ export default function PracticePage() {
   const getAudioUrl = () => {
     if (!task || !task.file_path) return "";
     const filename = task.file_path.split(/[\\/]/).pop();
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    let baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    baseUrl = baseUrl.replace(/\/api\/?$/, "");
     return `${baseUrl}/uploads/${filename}`;
   };
 
@@ -85,7 +92,10 @@ export default function PracticePage() {
       setIsPlaying(false);
     } else {
       const segment = segments[currentIndex];
-      audioRef.current.currentTime = segment.start;
+      // Only reset time if we're outside the current segment
+      if (audioRef.current.currentTime < segment.start || audioRef.current.currentTime >= segment.end) {
+        audioRef.current.currentTime = segment.start;
+      }
       audioRef.current.play();
       setIsPlaying(true);
     }
@@ -106,7 +116,11 @@ export default function PracticePage() {
       const newIndex = currentIndex - 1;
       setCurrentIndex(newIndex);
       setIsPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       loadRecording(newIndex);
+      api.updateTaskProgress(id, newIndex);
     }
   };
 
@@ -115,7 +129,25 @@ export default function PracticePage() {
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
       setIsPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       loadRecording(newIndex);
+      api.updateTaskProgress(id, newIndex);
+    }
+  };
+
+  const handleJump = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(e.target.value);
+    if (!isNaN(val) && val >= 1 && val <= segments.length) {
+      const newIndex = val - 1;
+      setCurrentIndex(newIndex);
+      setIsPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      loadRecording(newIndex);
+      api.updateTaskProgress(id, newIndex);
     }
   };
 
@@ -198,12 +230,22 @@ export default function PracticePage() {
       </div>
 
       {/* Top: Navigation */}
-      <div className="flex items-center justify-between w-full mb-8">
+      <div className="flex items-center justify-between w-full mb-8 gap-4">
         <Button variant="outline" size="icon" onClick={handlePrev} disabled={currentIndex === 0}>
           <ChevronLeft className="h-6 w-6" />
         </Button>
-        <div className="text-xl font-semibold">
-          Chunk {currentIndex + 1} / {segments.length}
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={1}
+            max={segments.length}
+            value={currentIndex + 1}
+            onChange={handleJump}
+            className="w-20 text-center text-lg font-semibold"
+          />
+          <span className="text-xl font-semibold">
+            / {segments.length}
+          </span>
         </div>
         <Button variant="outline" size="icon" onClick={handleNext} disabled={currentIndex === segments.length - 1}>
           <ChevronRight className="h-6 w-6" />
@@ -267,7 +309,7 @@ export default function PracticePage() {
       />
       <audio
         ref={userAudioRef}
-        src={userRecordingUrl || ""}
+        src={userRecordingUrl || undefined}
         onEnded={() => setIsPlayingRecording(false)}
       />
     </div>

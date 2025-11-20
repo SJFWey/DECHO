@@ -18,6 +18,7 @@ class Task(Base):
     filePath: Mapped[str] = mapped_column(String)
     duration: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     progress: Mapped[float] = mapped_column(Float, default=0.0)
+    lastPlayedChunkIndex: Mapped[int] = mapped_column(Integer, default=0)
     message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
     createdAt: Mapped[datetime] = mapped_column(

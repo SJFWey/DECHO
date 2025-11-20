@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window === 'undefined' ? 'http://127.0.0.1:8000/api' : '/api');
 const API_URL = `${API_BASE_URL}/audio`;
 
 export interface Task {
@@ -9,6 +9,7 @@ export interface Task {
   file_path?: string;
   filename?: string;
   progress: number;
+  last_played_chunk_index?: number;
   message?: string;
   duration?: number;
   created_at?: string;
@@ -53,8 +54,13 @@ export const api = {
   },
 
   listTasks: async () => {
-    const response = await axios.get<Task[]>(`${API_URL}/tasks`);
-    return response.data;
+    try {
+      const response = await axios.get<Task[]>(`${API_URL}/tasks`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch tasks from ${API_URL}/tasks`, error);
+      throw error;
+    }
   },
 
   deleteTask: async (taskId: string) => {
@@ -94,6 +100,17 @@ export const api = {
     const response = await axios.get<
       { id: string; segmentIndex: number; filePath: string; createdAt: string }[]
     >(`${API_URL}/practice/${taskId}`);
+    return response.data;
+  },
+
+  updateTaskProgress: async (taskId: string, lastPlayedChunkIndex: number) => {
+    const response = await axios.post<{ message: string }>(
+      `${API_URL}/tasks/${taskId}/progress`,
+      null,
+      {
+        params: { last_played_chunk_index: lastPlayedChunkIndex },
+      }
+    );
     return response.data;
   },
 

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from backend.llm import split_text_by_meaning
 from backend.utils import load_config, get_joiner
@@ -32,12 +32,15 @@ def get_spacy_model(language: str):
     return model
 
 
-def init_nlp(language: str = None):
+def init_nlp(language: Optional[str] = None):
     global _SPACY_CACHE
     try:
         config = load_config()
         if language is None:
-            language = config.get("app", {}).get("source_language", "en")
+            language = config.get("app", {}).get("source_language", "de")
+
+        if language is None:
+            language = "de"
 
         if language in _SPACY_CACHE:
             return _SPACY_CACHE[language]
@@ -56,7 +59,6 @@ def init_nlp(language: str = None):
             nlp = spacy.load(model)
 
         _SPACY_CACHE[language] = nlp
-        return nlp
         return nlp
     except Exception as e:
         logger.error(f"Failed to load NLP model: {e}")
@@ -175,7 +177,13 @@ def analyze_connectors(doc, token):
         return True, False
 
 
-def split_by_connectors(text, context_words=5, nlp=None):
+def split_by_connectors(text, context_words=5, nlp: Optional[Any] = None):
+    if nlp is None:
+        nlp = init_nlp()
+
+    if nlp is None:
+        raise ValueError("Failed to initialize NLP model")
+
     doc = nlp(text)
     sentences = [doc.text]
 
@@ -256,7 +264,7 @@ def split_long_sentence(doc):
     i = n
 
     config = load_config()
-    language = config.get("app", {}).get("target_language", "de")
+    language = config.get("app", {}).get("source_language", "en")
     joiner = get_joiner(language)
 
     while i > 0:
@@ -274,7 +282,16 @@ def align_segments_with_tokens(
     parts: List[str], tokens: List[str], timestamps: List[float]
 ) -> List[Dict[str, Any]]:
     """
-    Aligns text parts with audio using token timestamps.
+    Aligns text segments with original tokens to retrieve precise timestamps.
+    Uses a robust normalization approach to handle punctuation/whitespace differences.
+
+    Args:
+        parts (List[str]): List of text segments (e.g. from LLM).
+        tokens (List[str]): List of original tokens from ASR.
+        timestamps (List[float]): List of end timestamps for each token.
+
+    Returns:
+        List[Dict[str, Any]]: Aligned segments with 'start' and 'end' keys.
     """
     if not tokens or not timestamps or len(tokens) != len(timestamps):
         logger.warning(
@@ -282,91 +299,117 @@ def align_segments_with_tokens(
         )
         return []
 
-    # 1. Build character map from tokens
-    # char_map[i] = start_time of character i in "".join(tokens)
-    char_map = []
-    current_time = 0.0
-
-    # Pre-process tokens to ensure they are strings
     clean_tokens = [str(t) for t in tokens]
+    full_text = "".join(clean_tokens)
 
-    # We assume timestamps[i] is the END time of tokens[i]
-    # But we need to handle the first token start time.
-    # If we don't have start times, we assume contiguous flow.
+    if not full_text:
+        logger.warning("Tokenizer returned empty text. Falling back to linear.")
+        return []
 
-    for i, token in enumerate(clean_tokens):
-        end_time = timestamps[i]
-        # Start time is previous end time
-        start_time = current_time
+    # Build per-token timing info and a char->token lookup table
+    token_infos: List[Dict[str, float]] = []
+    char_to_token: List[int] = []
+    prev_end_time = 0.0
 
-        # Sanity check: if timestamp is weird
+    for idx, token in enumerate(clean_tokens):
+        try:
+            end_time = float(timestamps[idx])
+        except (TypeError, ValueError):
+            logger.warning(
+                "Non-numeric timestamp detected for token %s. Falling back to linear.",
+                token,
+            )
+            return []
+
+        # Determine start time for this token
+        # If it's the first token, or if there's a large gap from previous token,
+        # we estimate start time to avoid stretching the token duration.
+        if idx == 0:
+            # First token: assume it's short (e.g. max 0.5s) or starts at 0 if close enough
+            start_time = max(0.0, end_time - 0.5)
+        else:
+            # Check gap
+            if end_time - prev_end_time > 1.0:  # If gap > 1s, treat as silence
+                start_time = max(prev_end_time, end_time - 0.5)
+            else:
+                start_time = prev_end_time
+
+        # Ensure monotonicity (though start_time logic above tries to respect it)
+        if start_time < prev_end_time:
+            start_time = prev_end_time
+
         if end_time < start_time:
-            end_time = start_time + 0.01
+            end_time = start_time
 
-        token_len = len(token)
-        if token_len > 0:
-            duration = end_time - start_time
-            step = duration / token_len
-            for j in range(token_len):
-                char_time = start_time + j * step
-                char_map.append(char_time)
+        token_infos.append({"start_time": start_time, "end_time": end_time})
 
-        current_time = end_time
+        for _ in token:
+            char_to_token.append(idx)
 
-    raw_text = "".join(clean_tokens)
-    max_idx = len(raw_text)
+        prev_end_time = end_time
 
-    aligned_segments = []
-    raw_idx = 0
+    if len(char_to_token) != len(full_text):
+        logger.warning("Token/text length mismatch detected. Falling back to linear.")
+        return []
+
+    # Create normalized text and mapping back to original indices
+    # We want to match alphanumeric characters only to be robust against punctuation changes
+    normalized_text = ""
+    norm_to_orig_map = []
+
+    for i, char in enumerate(full_text):
+        if char.isalnum():
+            normalized_text += char.lower()
+            norm_to_orig_map.append(i)
+
+    aligned_segments: List[Dict[str, Any]] = []
+    search_pos = 0
 
     for part in parts:
-        if not part:
+        # Normalize the part
+        part_norm = "".join([c.lower() for c in part if c.isalnum()])
+
+        if not part_norm:
             continue
 
-        # Heuristic: match characters
-        match_start_idx = -1
-        match_end_idx = -1
+        # Find in normalized text
+        match_start = normalized_text.find(part_norm, search_pos)
 
-        current_raw_idx = raw_idx
-        first_char_found = False
+        if match_start == -1:
+            # Try from beginning if not found (in case of overlap or reordering)
+            match_start = normalized_text.find(part_norm)
 
-        for char in part:
-            if char.isspace():
-                continue
-
-            found = False
-            # Lookahead 100 chars
-            for offset in range(100):
-                if current_raw_idx + offset < max_idx:
-                    if raw_text[current_raw_idx + offset].lower() == char.lower():
-                        if not first_char_found:
-                            match_start_idx = current_raw_idx + offset
-                            first_char_found = True
-                        current_raw_idx = current_raw_idx + offset + 1
-                        found = True
-                        break
-
-            if not found:
-                pass
-
-        match_end_idx = current_raw_idx
-
-        if match_start_idx != -1 and match_end_idx > match_start_idx:
-            part_start_time = char_map[match_start_idx]
-            if match_end_idx < len(char_map):
-                part_end_time = char_map[match_end_idx]
-            else:
-                part_end_time = current_time
-
-            raw_idx = match_end_idx
-        else:
-            # Fallback
+        if match_start == -1:
+            # Fallback for this part if still not found
             part_start_time = aligned_segments[-1]["end"] if aligned_segments else 0.0
             part_end_time = part_start_time + 0.1
+            aligned_segments.append(
+                {"text": part, "start": part_start_time, "end": part_end_time}
+            )
+            continue
+
+        match_end = match_start + len(part_norm)
+
+        # Map back to original indices
+        # match_end is exclusive in slice, so the last char index is match_end - 1
+        orig_start_index = norm_to_orig_map[match_start]
+        orig_end_index = norm_to_orig_map[match_end - 1]
+
+        # Map to tokens
+        start_token_idx = char_to_token[orig_start_index]
+        end_token_idx = char_to_token[orig_end_index]
+
+        part_start_time = token_infos[start_token_idx]["start_time"]
+        part_end_time = token_infos[end_token_idx]["end_time"]
+
+        if part_end_time < part_start_time:
+            part_end_time = part_start_time
 
         aligned_segments.append(
             {"text": part, "start": part_start_time, "end": part_end_time}
         )
+
+        search_pos = match_end
 
     return aligned_segments
 

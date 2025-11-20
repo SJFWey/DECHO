@@ -30,6 +30,11 @@ export default function TasksPage() {
     };
 
     fetchTasks();
+
+    // Poll for updates every 3 seconds
+    const intervalId = setInterval(fetchTasks, 3000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   if (loading) {
@@ -57,7 +62,12 @@ export default function TasksPage() {
                 {task.file_path?.split(/[/\\]/).pop() || "Unknown File"}
               </CardTitle>
               <CardDescription>
-                Status: <span className="capitalize">{task.status}</span>
+                Status:{" "}
+                {task.status === "failed" ? (
+                  <span className="text-red-500 font-bold">Error</span>
+                ) : (
+                  <span className="capitalize">{task.status}</span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -61,7 +61,6 @@ def load_config(reload: bool = False) -> Dict[str, Any]:
             config = yaml.safe_load(f)
             _config_cache = config
             _config_mtime = current_mtime
-            return config
 
         # Basic validation
         if "asr" not in config or "app" not in config:

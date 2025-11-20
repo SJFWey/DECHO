@@ -11,8 +11,8 @@ async def get_config():
     try:
         config = load_config()
         # Mask sensitive information
-        if "llm" in config and "api_key" in config["llm"]:
-            config["llm"]["api_key"] = "********"
+        # if "llm" in config and "api_key" in config["llm"]:
+        #     config["llm"]["api_key"] = "********"
         return config
     except ConfigError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -32,9 +32,13 @@ async def update_config(config_update: ConfigUpdate):
         if config_update.llm:
             if "llm" not in current_config:
                 current_config["llm"] = {}
-            current_config["llm"].update(
-                config_update.llm.model_dump(exclude_unset=True)
-            )
+
+            update_data = config_update.llm.model_dump(exclude_unset=True)
+            # Don't update api_key if it's the masked value
+            if update_data.get("api_key") == "********":
+                del update_data["api_key"]
+
+            current_config["llm"].update(update_data)
 
         if config_update.app:
             current_config["app"].update(
@@ -60,6 +64,11 @@ async def test_llm(config_update: ConfigUpdate):
         from backend.llm import chat_completion
 
         api_key = config_update.llm.api_key if config_update.llm else None
+        # If api_key is masked, try to load from current config
+        if api_key == "********":
+            current_config = load_config()
+            api_key = current_config.get("llm", {}).get("api_key")
+
         base_url = config_update.llm.base_url if config_update.llm else None
         model = config_update.llm.model if config_update.llm else None
 

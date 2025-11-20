@@ -31,6 +31,8 @@ export default function PracticePage() {
     };
 
     fetchTasks();
+    const interval = setInterval(fetchTasks, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

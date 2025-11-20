@@ -168,7 +168,14 @@ export default function TaskPage() {
         <CardContent>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Status: <span className="font-semibold capitalize">{task.status}</span></span>
+              <span>
+                Status:{" "}
+                {task.status === "failed" ? (
+                  <span className="font-semibold text-red-500">Error</span>
+                ) : (
+                  <span className="font-semibold capitalize">{task.status}</span>
+                )}
+              </span>
               <span>{Math.round(task.progress * 100)}%</span>
             </div>
             <Progress value={task.progress * 100} />

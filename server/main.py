@@ -4,10 +4,18 @@ from fastapi.staticfiles import StaticFiles
 from server.routers import audio, config
 import os
 from contextlib import asynccontextmanager
+from backend.asr import get_asr_instance
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Preload ASR model
+    logger.info("Preloading ASR model...")
+    get_asr_instance()
+    logger.info("ASR model loaded.")
     yield
 
 
