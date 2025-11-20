@@ -15,6 +15,7 @@ def chat_completion(
     model: Optional[str] = None,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
+    raise_on_error: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Sends a chat completion request to the LLM API.
@@ -24,6 +25,7 @@ def chat_completion(
         model (Optional[str]): Model name to use. Defaults to config.
         api_key (Optional[str]): API key to use. Defaults to config/env.
         base_url (Optional[str]): Base URL to use. Defaults to config.
+        raise_on_error (bool): Whether to raise an exception on error.
 
     Returns:
         Optional[Dict[str, Any]]: The JSON response from the API, or None if failed.
@@ -34,6 +36,8 @@ def chat_completion(
     # Prioritize argument -> environment variable -> config
     api_key = api_key or os.getenv("LLM_API_KEY") or llm_config.get("api_key")
     base_url = base_url or llm_config.get("base_url", "https://example-llm-provider.com/v1")
+    if base_url:
+        base_url = base_url.rstrip("/")
     default_model = llm_config.get("model", "openai/gpt-4o")
 
     if not api_key:
@@ -62,6 +66,10 @@ def chat_completion(
         logger.error(f"LLM Request failed: {e}")
         if response:
             logger.error(f"Response: {response.text}")
+
+        if raise_on_error:
+            raise e
+
         return None
 
 

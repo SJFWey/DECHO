@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2, ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -51,9 +52,10 @@ export default function SettingsPage() {
       const data = getValues()
       await api.testConfig(data)
       toast.success("Connection successful")
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      toast.error("Connection failed")
+      const message = error.response?.data?.detail || "Connection failed"
+      toast.error(message)
     } finally {
       setTesting(false)
     }
@@ -62,8 +64,15 @@ export default function SettingsPage() {
   if (loading) return <div className="p-8">Loading settings...</div>
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+    <div className="max-w-5xl mx-auto space-y-6 w-full px-4 py-8">
+      <div className="flex items-center gap-4">
+        <Link href="/">
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-secondary/80">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <h1 className="text-2xl font-bold">Settings</h1>
+      </div>
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>

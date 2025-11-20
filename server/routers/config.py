@@ -75,7 +75,11 @@ async def test_llm(config_update: ConfigUpdate):
         messages = [{"role": "user", "content": "Hello, are you working?"}]
 
         response = chat_completion(
-            messages=messages, model=model, api_key=api_key, base_url=base_url
+            messages=messages,
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            raise_on_error=True,
         )
 
         if response:
@@ -88,4 +92,11 @@ async def test_llm(config_update: ConfigUpdate):
             raise HTTPException(status_code=500, detail="LLM returned no response")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Include the actual error message in the response
+        error_detail = str(e)
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_detail += f" - Response: {e.response.text}"
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=error_detail)

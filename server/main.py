@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from server.routers import audio, config
+from server.database import engine, Base
 import os
 from contextlib import asynccontextmanager
 from backend.asr import get_asr_instance
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create tables if they don't exist
+    Base.metadata.create_all(bind=engine)
+
     # Preload ASR model
     logger.info("Preloading ASR model...")
     get_asr_instance()

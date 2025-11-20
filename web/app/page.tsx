@@ -1,18 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api, Task } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,14 +12,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Upload, Loader2, Mic, Download, FileText, FileJson, FileType, Trash2 } from "lucide-react";
+import { Loader2, Mic, Download, FileText, FileJson, FileType, Trash2, Play, MoreHorizontal, Settings } from "lucide-react";
 import axios from "axios";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -39,7 +34,6 @@ export default function HomePage() {
   const fetchTasks = async () => {
     try {
       const data = await api.listTasks();
-      // Sort by created_at desc
       const sorted = data.sort((a, b) => {
         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -48,7 +42,6 @@ export default function HomePage() {
       setTasks(sorted);
     } catch (error) {
       console.error("Failed to fetch tasks", error);
-      toast.error("Failed to load tasks");
     } finally {
       setLoadingTasks(false);
     }
@@ -61,16 +54,19 @@ export default function HomePage() {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file) {
+        fileInputRef.current?.click();
+        return;
+    }
 
     try {
       setUploading(true);
       const task = await api.upload(file);
       toast.success("File uploaded successfully");
       setFile(null);
-      // Refresh list
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      
       fetchTasks();
-      // Optionally start processing immediately
       try {
         await api.process(task.task_id);
         toast.info("Processing started");
@@ -99,12 +95,9 @@ export default function HomePage() {
     const normalized = hasTimezone ? dateString : `${dateString}Z`;
     const date = new Date(normalized);
     if (isNaN(date.getTime())) return "-";
-    return date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
     });
   };
 
@@ -163,146 +156,177 @@ export default function HomePage() {
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      {/* Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload New Task</CardTitle>
-          <CardDescription>Upload an audio file to start practicing.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4">
-            <div className="grid w-full max-w-sm items-center gap-1.5">
-              <Label htmlFor="audio">Audio File</Label>
-              <Input
-                id="audio"
-                type="file"
+    <div className="flex flex-col items-center w-full max-w-5xl px-4 space-y-12">
+      
+      {/* Settings Button */}
+      <div className="fixed top-4 right-4 z-50">
+        <Link href="/settings" className="p-2 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground block">
+          <Settings className="w-5 h-5" />
+        </Link>
+      </div>
+
+      {/* Hero / Title */}
+      <div className="text-center space-y-4 mt-10">
+        <h1 className="text-6xl font-bold tracking-tighter bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+          DECHO
+        </h1>
+      </div>
+
+      {/* Upload Input (Google Search Style) */}
+      <div className="w-full max-w-2xl relative group">
+        <div 
+            className={cn(
+                "relative flex items-center w-full h-14 rounded-full bg-secondary/30 border border-white/10 backdrop-blur-md transition-all duration-300",
+                "hover:bg-secondary/40 hover:shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:border-white/20",
+                "focus-within:bg-secondary/50 focus-within:shadow-[0_0_25px_rgba(255,255,255,0.1)] focus-within:border-white/30"
+            )}
+        >
+            <input 
+                type="file" 
+                ref={fileInputRef}
+                className="hidden" 
                 accept="audio/*"
                 onChange={handleFileChange}
-              />
-            </div>
-            <Button onClick={handleUpload} disabled={!file || uploading}>
-              {uploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            />
+            
+            <input 
+                type="text"
+                readOnly
+                placeholder="Upload an audio file"
+                value={file ? file.name : ""}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-full bg-transparent border-none outline-none px-8 text-lg placeholder:text-muted-foreground/50 cursor-pointer text-foreground"
+            />
 
-      {/* Task List Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Uploaded Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loadingTasks ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : tasks.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No tasks found. Upload one to get started.
-            </div>
-          ) : (
-            <div className="relative w-full overflow-auto">
-              <table className="w-full caption-bottom text-sm">
-                <thead className="[&_tr]:border-b">
-                  <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                    <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Filename</th>
-                    <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Duration</th>
-                    <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Uploaded At</th>
-                    <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Status</th>
-                    <th className="h-12 px-4 text-center align-middle font-medium text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="[&_tr:last-child]:border-0">
-                  {tasks.map((task) => (
-                    <tr
-                      key={task.task_id}
-                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+            {/* Upload Button */}
+            <div className="absolute right-2 top-2 bottom-2 group/upload-btn">
+                <div className="relative h-full rounded-full overflow-hidden p-[1px]">
+                    {/* Default Border */}
+                    <div className="absolute inset-0 bg-zinc-800 transition-opacity duration-300 group-hover/upload-btn:opacity-0" />
+                    
+                    {/* Rotating Gradient Border */}
+                    <div className="absolute inset-[-100%] bg-[conic-gradient(from_90deg_at_50%_50%,#71717a_0%,#e4e4e7_50%,#71717a_100%)] animate-[spin_2s_linear_infinite] opacity-0 transition-opacity duration-300 group-hover/upload-btn:opacity-100" />
+                    
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpload();
+                        }}
+                        disabled={uploading}
+                        className="relative h-full px-6 rounded-full bg-background/90 hover:bg-background/70 text-white text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <td className="p-4 align-middle font-medium text-center">
-                        {task.filename || task.file_path?.split(/[\\/]/).pop() || task.task_id}
-                      </td>
-                      <td className="p-4 align-middle text-center">{formatDuration(task.duration)}</td>
-                      <td className="p-4 align-middle text-center">{formatDate(task.created_at)}</td>
-                      <td className="p-4 align-middle text-center">
-                        {task.status === "failed" ? (
-                          <span className="text-red-500 font-bold">Error</span>
+                        {uploading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <span className="capitalize">{task.status}</span>
+                            "Upload"
                         )}
-                      </td>
-                      <td className="p-4 align-middle text-center">
-                        <div className="flex justify-center items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Practice"
-                            onClick={() => router.push(`/practice/${task.task_id}`)}
-                          >
-                            <Mic className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Download Audio"
-                            onClick={() => handleDownloadAudio(task)}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          
-                                                    <SubtitleDownloadButton task={task} onDownload={handleDownloadSubtitle} />
-                          
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Delete Task"
-                            onClick={() => handleDeleteTask(task)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    </button>
+                </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Task Table */}
+      <div className="w-full max-w-4xl space-y-4">
+        {loadingTasks ? (
+            <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+            </div>
+        ) : tasks.length > 0 && (
+            <div className={cn(
+                "w-full overflow-hidden rounded-2xl border border-white/5 bg-secondary/10 backdrop-blur-sm transition-all duration-300",
+                "hover:shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:border-white/10"
+            )}>
+                <table className="w-full text-sm text-left">
+                    <thead className="text-xs uppercase text-muted-foreground/60 font-medium border-b border-white/5">
+                        <tr>
+                            <th className="px-6 py-4">Filename</th>
+                            <th className="px-6 py-4 text-center">Duration</th>
+                            <th className="px-6 py-4 text-center">Date</th>
+                            <th className="px-6 py-4 text-center">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                        {tasks.map((task) => (
+                            <tr 
+                                key={task.task_id} 
+                                className="group transition-all duration-300 hover:bg-white/5 hover:shadow-[0_0_15px_rgba(255,255,255,0.02)]"
+                            >
+                                <td className="px-6 py-4 font-medium text-foreground/90 truncate max-w-[200px]">
+                                    {task.filename || "Untitled"}
+                                </td>
+                                <td className="px-6 py-4 text-center text-muted-foreground">
+                                    {formatDuration(task.duration)}
+                                </td>
+                                <td className="px-6 py-4 text-center text-muted-foreground">
+                                    {formatDate(task.created_at)}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <StatusBadge status={task.status} />
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex justify-end items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 rounded-full text-zinc-400 hover:bg-white/10 hover:text-blue-400 transition-colors"
+                                            onClick={() => router.push(`/practice/${task.task_id}`)}
+                                        >
+                                            <Play className="h-4 w-4" />
+                                        </Button>
+                                        
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-zinc-400 hover:bg-white/10 hover:text-foreground transition-colors">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-xl border-white/10">
+                                                <DropdownMenuItem onClick={() => handleDownloadAudio(task)}>
+                                                    <Download className="mr-2 h-4 w-4" /> Download Audio
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDownloadSubtitle(task, 'srt')}>
+                                                    <FileType className="mr-2 h-4 w-4" /> Download SRT
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDownloadSubtitle(task, 'json')}>
+                                                    <FileJson className="mr-2 h-4 w-4" /> Download JSON
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem 
+                                                    onClick={() => handleDeleteTask(task)}
+                                                    className="text-red-400 focus:text-red-400 focus:bg-red-400/10"
+                                                >
+                                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function SubtitleDownloadButton({ task, onDownload }: { task: Task, onDownload: (task: Task, format: 'srt' | 'json') => void }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" title="Download Subtitle">
-          <FileText className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => onDownload(task, "srt")}>
-          <FileType className="mr-2 h-4 w-4" />
-          <span>SRT</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onDownload(task, "json")}>
-          <FileJson className="mr-2 h-4 w-4" />
-          <span>JSON</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+function StatusBadge({ status }: { status: string }) {
+    const styles = {
+        completed: "bg-green-500/10 text-green-400 border-green-500/20",
+        processing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+        pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        failed: "bg-red-500/10 text-red-400 border-red-500/20",
+    };
+    
+    const style = styles[status as keyof typeof styles] || "bg-gray-500/10 text-gray-400 border-gray-500/20";
+
+    return (
+        <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium border", style)}>
+            {status}
+        </span>
+    );
 }
+
