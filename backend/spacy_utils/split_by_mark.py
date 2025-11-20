@@ -1,22 +1,20 @@
+import logging
 import os
 import pandas as pd
 import warnings
 from backend.spacy_utils.load_nlp_model import init_nlp, SPLIT_BY_MARK_FILE
-from backend.utils import load_key, get_joiner
-from rich import print as rprint
+from backend.utils import load_config, get_joiner
+
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def split_by_mark(nlp):
-    whisper_language = load_key("whisper.language")
-    language = (
-        load_key("whisper.detected_language")
-        if whisper_language == "auto"
-        else whisper_language
-    )  # consider force english case
+    config = load_config()
+    language = config.get("app", {}).get("target_language", "de")
     joiner = get_joiner(language)
-    rprint(f"[blue]🔍 Using {language} language joiner: '{joiner}'[/blue]")
+    logger.info(f"Using {language} language joiner: '{joiner}'")
     chunks = pd.read_excel("output/log/cleaned_chunks.xlsx")
     chunks.text = chunks.text.apply(lambda x: x.strip('"').strip(""))
 
@@ -54,7 +52,7 @@ def split_by_mark(nlp):
 
     with open(SPLIT_BY_MARK_FILE, "w", encoding="utf-8") as output_file:
         for i, sentence in enumerate(sentences_by_mark):
-            if i > 0 and sentence.strip() in [",", ".", "，", "。", "？", "！"]:
+            if i > 0 and sentence.strip() in [",", ".", "", "", "", ""]:
                 # ! If the current line contains only punctuation, merge it with the previous line, this happens in Chinese, Japanese, etc.
                 output_file.seek(
                     output_file.tell() - 1, os.SEEK_SET
@@ -63,8 +61,8 @@ def split_by_mark(nlp):
             else:
                 output_file.write(sentence + "\n")
 
-    rprint(
-        f"[green]💾 Sentences split by punctuation marks saved to →  `{SPLIT_BY_MARK_FILE}`[/green]"
+    logger.info(
+        f"Sentences split by punctuation marks saved to →  `{SPLIT_BY_MARK_FILE}`"
     )
 
 

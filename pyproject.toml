@@ -12,4 +12,13 @@ dependencies = [
     "sherpa-onnx>=1.12.17",
     "soundfile>=0.13.1",
     "streamlit>=1.51.0",
+    "rich>=13.9.4",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.4",
+    "ruff>=0.8.2",
+    "mypy>=1.13.0",
+    "black>=24.10.0",
 ]

@@ -1,13 +1,12 @@
+import logging
 import os
 import shutil
 import subprocess
 from typing import Optional
 
+from backend.exceptions import AudioConversionError
 
-class AudioConversionError(RuntimeError):
-    """
-    Raised when the uploaded audio cannot be converted to the normalized WAV format.
-    """
+logger = logging.getLogger(__name__)
 
 
 def _ffmpeg_binary() -> Optional[str]:
@@ -36,6 +35,7 @@ def convert_to_wav(input_path: str) -> str:
     Raises:
         AudioConversionError: Raised when conversion fails for all available backends.
     """
+    logger.info(f"Converting audio: {input_path}")
     output_path = os.path.splitext(input_path)[0] + ".wav"
 
     if os.path.abspath(input_path) == os.path.abspath(output_path):
@@ -45,6 +45,7 @@ def convert_to_wav(input_path: str) -> str:
     ffmpeg_bin = _ffmpeg_binary()
 
     if not ffmpeg_bin:
+        logger.error("ffmpeg executable not found.")
         raise AudioConversionError(
             "ffmpeg executable not found. Please install ffmpeg and add it to your PATH."
         )
@@ -67,7 +68,9 @@ def convert_to_wav(input_path: str) -> str:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        logger.info(f"Audio converted successfully: {output_path}")
         return output_path
     except subprocess.CalledProcessError as exc:
         error_msg = exc.stderr.decode().strip() if exc.stderr else str(exc)
+        logger.error(f"ffmpeg conversion failed: {error_msg}")
         raise AudioConversionError(f"ffmpeg conversion failed: {error_msg}") from exc

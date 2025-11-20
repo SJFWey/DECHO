@@ -1,9 +1,11 @@
+import logging
 import os
 import string
 import warnings
 from backend.spacy_utils.load_nlp_model import init_nlp, SPLIT_BY_CONNECTOR_FILE
-from backend.utils import *
-from backend.utils import _3_1_SPLIT_BY_NLP
+from backend.utils import load_config, get_joiner, _3_1_SPLIT_BY_NLP
+
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -37,13 +39,11 @@ def split_long_sentence(doc):
     # rebuild sentences based on optimal split points
     sentences = []
     i = n
-    whisper_language = load_key("whisper.language")
-    language = (
-        load_key("whisper.detected_language")
-        if whisper_language == "auto"
-        else whisper_language
-    )  # consider force english case
+
+    config = load_config()
+    language = config.get("app", {}).get("target_language", "de")
     joiner = get_joiner(language)
+
     while i > 0:
         j = prev[i]
         sentences.append(joiner.join(tokens[j:i]).strip())
@@ -94,7 +94,7 @@ def split_long_by_root_main(nlp):
                 ]
             all_split_sentences.extend(split_sentences)
             rprint(
-                f"[yellow]✂️  Splitting long sentences by root: {sentence[:30]}...[/yellow]"
+                f"[yellow]  Splitting long sentences by root: {sentence[:30]}...[/yellow]"
             )
         else:
             all_split_sentences.append(sentence.strip())
@@ -109,8 +109,8 @@ def split_long_by_root_main(nlp):
             if not stripped_sentence or all(
                 char in punctuation for char in stripped_sentence
             ):
-                rprint(
-                    f"[yellow]⚠️  Warning: Empty or punctuation-only line detected at index {i}[/yellow]"
+                logger.warning(
+                    f"Warning: Empty or punctuation-only line detected at index {i}"
                 )
                 if i > 0:
                     all_split_sentences[i - 1] += sentence
@@ -120,15 +120,13 @@ def split_long_by_root_main(nlp):
     # delete the original file
     os.remove(SPLIT_BY_CONNECTOR_FILE)
 
-    rprint(
-        f"[green]💾 Long sentences split by root saved to →  {_3_1_SPLIT_BY_NLP}[/green]"
-    )
+    logger.info(f"Long sentences split by root saved to →  {_3_1_SPLIT_BY_NLP}")
 
 
 if __name__ == "__main__":
     nlp = init_nlp()
     split_long_by_root_main(nlp)
-    # raw = "平口さんの盛り上げごまが初めて売れました本当に嬉しいです本当にやっぱり見た瞬間いいって言ってくれるそういうコマを作るのがやっぱりいいですよねその2ヶ月後チコさんが何やらそわそわしていましたなんか気持ち悪いやってきたのは平口さんの駒の評判を聞きつけた愛知県の収集家ですこの男性師匠大沢さんの駒も持っているといいますちょっと褒めすぎかなでも確実にファンは広がっているようです自信がない部分をすごく感じてたのでこれで自信を持って進んでくれるなっていう本当に始まったばっかりこれからいろいろ挑戦していってくれるといいなと思って今月平口さんはある場所を訪れましたこれまで数々のタイトル戦でコマを提供してきた老舗5番手平口さんのコマを扱いたいと言いますいいですねぇ困ってだんだん成長しますので大切に使ってそういう長く良い駒になる駒ですね商談が終わった後店主があるものを取り出しましたこの前の名人戦で使った駒があるんですけど去年、名人銭で使われた盛り上げごま低く盛り上げて品良くするというのは難しい素晴らしいですね平口さんが目指す高みですこういった感じで作れればまだまだですけどただ、多分、咲く。"
+    # raw = "25"
     # nlp = init_nlp()
     # doc = nlp(raw.strip())
     # for sent in split_still_long_sentence(doc):

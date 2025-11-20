@@ -1,39 +1,55 @@
+import logging
 import spacy
 from spacy.cli import download
-from backend.utils import rprint, load_key, except_handler
+from backend.utils import load_config
 
-SPACY_MODEL_MAP = load_key("spacy_model_map")
+logger = logging.getLogger(__name__)
+
+# Default map if not in config
+DEFAULT_SPACY_MODEL_MAP = {
+    "en": "en_core_web_md",
+    "zh": "zh_core_web_sm",
+    "de": "de_core_news_md",
+}
 
 
 def get_spacy_model(language: str):
-    model = SPACY_MODEL_MAP.get(language.lower(), "en_core_web_md")
-    if language not in SPACY_MODEL_MAP:
-        rprint(
-            f"[yellow]Spacy model does not support '{language}', using en_core_web_md model as fallback...[/yellow]"
+    config = load_config()
+    # Try to get map from config, else use default
+    model_map = config.get("app", {}).get("spacy_model_map", DEFAULT_SPACY_MODEL_MAP)
+
+    model = model_map.get(language.lower(), "en_core_web_md")
+    if language not in model_map:
+        logger.warning(
+            f"Spacy model does not support '{language}', using en_core_web_md model as fallback..."
         )
     return model
 
 
-@except_handler("Failed to load NLP Spacy model")
 def init_nlp():
-    language = (
-        "en"
-        if load_key("whisper.language") == "en"
-        else load_key("whisper.detected_language")
-    )
-    model = get_spacy_model(language)
-    rprint(f"[blue]⏳ Loading NLP Spacy model: <{model}> ...[/blue]")
     try:
-        nlp = spacy.load(model)
-    except:
-        rprint(f"[yellow]Downloading {model} model...[/yellow]")
-        rprint(
-            "[yellow]If download failed, please check your network and try again.[/yellow]"
-        )
-        download(model)
-        nlp = spacy.load(model)
-    rprint("[green]✅ NLP Spacy model loaded successfully![/green]")
-    return nlp
+        config = load_config()
+        # Determine language: prioritize target_language, fallback to 'de' for this app
+        language = config.get("app", {}).get("target_language", "de")
+
+        model = get_spacy_model(language)
+        logger.info(f"Loading NLP Spacy model: <{model}> ...")
+
+        try:
+            nlp = spacy.load(model)
+        except OSError:
+            logger.warning(f"Downloading {model} model...")
+            logger.warning(
+                "If download failed, please check your network and try again."
+            )
+            download(model)
+            nlp = spacy.load(model)
+
+        logger.info("NLP Spacy model loaded successfully!")
+        return nlp
+    except Exception as e:
+        logger.error(f"Failed to load NLP Spacy model: {e}")
+        raise e
 
 
 # --------------------

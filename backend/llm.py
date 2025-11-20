@@ -1,23 +1,41 @@
-import requests
 import json
-import yaml
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
+import requests
+
+from backend.utils import load_config
+
+logger = logging.getLogger(__name__)
 
 
-def load_config():
-    with open("config.yaml", "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def chat_completion(
+    messages: List[Dict[str, str]], model: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Sends a chat completion request to the LLM API.
 
+    Args:
+        messages (List[Dict[str, str]]): List of message dictionaries.
+        model (Optional[str]): Model name to use. Defaults to config.
 
-def chat_completion(messages, model=None):
+    Returns:
+        Optional[Dict[str, Any]]: The JSON response from the API, or None if failed.
+    """
     config = load_config()
     llm_config = config.get("llm", {})
 
-    api_key = llm_config.get("api_key")
+    # Prioritize environment variable for API key
+    api_key = os.getenv("LLM_API_KEY") or llm_config.get("api_key")
     base_url = llm_config.get("base_url", "https://example-llm-provider.com/v1")
     default_model = llm_config.get("model", "openai/gpt-4o")
 
     if not api_key:
-        raise ValueError("LLM API Key not found in config.yaml")
+        logger.error(
+            "LLM API Key not found. Please set LLM_API_KEY env var or config.yaml."
+        )
+        raise ValueError("LLM API Key not found")
 
     url = f"{base_url}/chat/completions"
 
@@ -36,15 +54,22 @@ def chat_completion(messages, model=None):
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"LLM Request failed: {e}")
+        logger.error(f"LLM Request failed: {e}")
         if response:
-            print(f"Response: {response.text}")
+            logger.error(f"Response: {response.text}")
         return None
 
 
-def split_text_by_meaning(text, max_length=80):
+def split_text_by_meaning(text: str, max_length: int = 80) -> List[str]:
     """
     Uses LLM to split text into meaningful segments.
+
+    Args:
+        text (str): The text to split.
+        max_length (int): Target maximum length for segments.
+
+    Returns:
+        List[str]: List of text segments.
     """
     prompt = f"""
     Split the following text into smaller, meaningful segments for subtitle generation, 
@@ -78,6 +103,8 @@ def split_text_by_meaning(text, max_length=80):
 
             return json.loads(content.strip())
         except json.JSONDecodeError:
-            print("Failed to parse LLM response as JSON. Returning original text.")
+            logger.warning(
+                "Failed to parse LLM response as JSON. Returning original text."
+            )
             return [text]
     return [text]

@@ -1,14 +1,20 @@
+import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 import soundfile as sf
-import yaml
+
+from backend.utils import load_config
+
+logger = logging.getLogger(__name__)
 
 try:
     import sherpa_onnx
 except ImportError:
-    print("sherpa-onnx not found. Please install it with: pip install sherpa-onnx")
+    logger.error(
+        "sherpa-onnx not found. Please install it with: pip install sherpa-onnx"
+    )
     sherpa_onnx = None
 
 
@@ -114,12 +120,11 @@ class ParakeetASR:
             raise ImportError("sherpa-onnx is required for Parakeet ASR.")
 
         if model_dir is None:
-            with open("config.yaml", "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-                model_dir = config.get("asr", {}).get(
-                    "parakeet_model_dir",
-                    "models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
-                )
+            config = load_config()
+            model_dir = config.get("asr", {}).get(
+                "parakeet_model_dir",
+                "models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+            )
 
         self.model_dir = model_dir
         self.expected_sample_rate = 16000
@@ -149,6 +154,7 @@ class ParakeetASR:
         if not os.path.exists(tokens_path):
             raise FileNotFoundError(f"Tokens file not found at {tokens_path}")
 
+        logger.info(f"Loading Parakeet model from {self.model_dir}")
         self.recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(
             encoder=encoder_path,
             decoder=decoder_path,
@@ -172,20 +178,20 @@ class ParakeetASR:
         if not os.path.exists(audio_file):
             raise FileNotFoundError(f"Audio file not found: {audio_file}")
 
+        logger.info(f"Transcribing audio: {audio_file}")
+
         # Explicitly cast the result of sf.read to avoid type checking issues
         # where it might be inferred as NoReturn or untyped.
         audio, sample_rate = cast(
             Tuple[np.ndarray, int], sf.read(audio_file, dtype="float32")
         )
 
-        print(
-            f"[DEBUG] Original audio shape: {audio.shape}, dtype: {audio.dtype}, sample_rate: {sample_rate}Hz"
+        logger.debug(
+            f"Original audio shape: {audio.shape}, dtype: {audio.dtype}, sample_rate: {sample_rate}Hz"
         )
 
         if len(audio.shape) > 1 and audio.shape[1] > 1:
-            print(
-                f"[DEBUG] Converting stereo audio (channels={audio.shape[1]}) to mono"
-            )
+            logger.debug(f"Converting stereo audio (channels={audio.shape[1]}) to mono")
             audio = np.mean(audio, axis=1)
 
         audio = audio.flatten()
@@ -195,8 +201,8 @@ class ParakeetASR:
             raise ValueError("Loaded audio file contains no samples.")
 
         if sample_rate != self.expected_sample_rate:
-            print(
-                f"[INFO] Resampling audio from {sample_rate}Hz to {self.expected_sample_rate}Hz."
+            logger.info(
+                f"Resampling audio from {sample_rate}Hz to {self.expected_sample_rate}Hz."
             )
             audio = _resample_audio(audio, sample_rate, self.expected_sample_rate)
             sample_rate = self.expected_sample_rate
@@ -204,11 +210,11 @@ class ParakeetASR:
         if audio.dtype != np.float32:
             audio = audio.astype(np.float32)
 
-        print(f"[DEBUG] Processed audio shape: {audio.shape}, dtype: {audio.dtype}")
+        logger.debug(f"Processed audio shape: {audio.shape}, dtype: {audio.dtype}")
 
         # If audio is longer than 60 seconds (16000 * 60 samples), use chunked processing
         if len(audio) > 60 * sample_rate:
-            print("[INFO] Audio is long (>60s), using chunked processing.")
+            logger.info("Audio is long (>60s), using chunked processing.")
             return self._transcribe_long_audio(audio, sample_rate)
 
         stream = self.recognizer.create_stream()
@@ -216,7 +222,7 @@ class ParakeetASR:
         self.recognizer.decode_stream(stream)
         result = stream.result
 
-        print(f"[DEBUG] Transcription result: {result.text}")
+        logger.debug(f"Transcription result: {result.text}")
 
         return {
             "text": result.text,
@@ -245,8 +251,8 @@ class ParakeetASR:
             if len(chunk) < 1600:  # Skip tiny chunks (< 0.1s)
                 continue
 
-            print(
-                f"[DEBUG] Processing chunk {i + 1}/{len(split_indices) - 1}: {len(chunk) / sample_rate:.2f}s"
+            logger.debug(
+                f"Processing chunk {i + 1}/{len(split_indices) - 1}: {len(chunk) / sample_rate:.2f}s"
             )
 
             stream = self.recognizer.create_stream()

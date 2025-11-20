@@ -1,35 +1,78 @@
-from rich import print as rprint
+import logging
+import os
+import sys
+from typing import Any, Dict
+
+import yaml
+from rich.logging import RichHandler
+
+from backend.exceptions import ConfigError
+
+# Constants
+_3_1_SPLIT_BY_NLP = "output/log/split_by_nlp.txt"
 
 
-def load_key(key):
-    # Mock implementation or read from global config
-    # For now, return defaults
-    defaults = {
-        "whisper.language": "en",
-        "whisper.detected_language": "en",
-        "spacy_model_map": {"en": "en_core_web_sm", "zh": "zh_core_web_sm"},
-    }
-    return defaults.get(key, "en")
+def setup_logging() -> None:
+    """
+    Configures the logging system.
+    Logs are output to the console (using Rich) and to a file in output/log/.
+    """
+    log_dir = "output/log"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "hearing.log")
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            RichHandler(rich_tracebacks=True),
+            logging.FileHandler(log_file, encoding="utf-8"),
+        ],
+    )
 
 
-def get_joiner(language):
+def load_config() -> Dict[str, Any]:
+    """
+    Loads and validates the configuration from config.yaml.
+
+    Returns:
+        Dict[str, Any]: The configuration dictionary.
+
+    Raises:
+        ConfigError: If the configuration file is missing or invalid.
+    """
+    config_path = "config.yaml"
+    if not os.path.exists(config_path):
+        raise ConfigError(f"Configuration file not found: {config_path}")
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise ConfigError(f"Error parsing config.yaml: {e}")
+
+    if not config:
+        raise ConfigError("Configuration file is empty.")
+
+    # Validation
+    required_sections = ["asr", "app"]
+    for section in required_sections:
+        if section not in config:
+            raise ConfigError(f"Missing required section '{section}' in config.yaml")
+
+    return config
+
+
+def get_joiner(language: str) -> str:
+    """
+    Returns the joiner character for the given language.
+
+    Args:
+        language (str): The language code (e.g., "en", "zh", "de").
+
+    Returns:
+        str: The joiner character (" " or "").
+    """
     if language == "zh":
         return ""
     return " "
-
-
-def except_handler(msg):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                rprint(f"[red]{msg}: {e}[/red]")
-                raise e
-
-        return wrapper
-
-    return decorator
-
-
-_3_1_SPLIT_BY_NLP = "output/log/split_by_nlp.txt"

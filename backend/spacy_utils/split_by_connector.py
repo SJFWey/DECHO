@@ -1,3 +1,4 @@
+import logging
 import os
 import warnings
 from backend.spacy_utils.load_nlp_model import (
@@ -5,7 +6,8 @@ from backend.spacy_utils.load_nlp_model import (
     SPLIT_BY_COMMA_FILE,
     SPLIT_BY_CONNECTOR_FILE,
 )
-from backend.utils import rprint
+
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -29,13 +31,13 @@ def analyze_connectors(doc, token):
         verb_pos = "VERB"
         noun_pos = ["NOUN", "PROPN"]
     elif lang == "zh":
-        connectors = ["因为", "所以", "但是", "而且", "虽然", "如果", "即使", "尽管"]
+        connectors = ["", "", "", "", "", "", "", ""]
         mark_dep = "mark"
         det_pron_deps = ["det", "pron"]
         verb_pos = "VERB"
         noun_pos = ["NOUN", "PROPN"]
     elif lang == "ja":
-        connectors = ["けれども", "しかし", "だから", "それで", "ので", "のに", "ため"]
+        connectors = ["", "", "", "", "", "", ""]
         mark_dep = "mark"
         det_pron_deps = ["case"]
         verb_pos = "VERB"
@@ -126,8 +128,8 @@ def split_by_connectors(text, context_words=5, nlp=None):
                     and len(right_words) >= context_words
                     and split_before
                 ):
-                    rprint(
-                        f"[yellow]✂️  Split before '{token.text}': {' '.join(left_words)}| {token.text} {' '.join(right_words)}[/yellow]"
+                    logger.debug(
+                        f"Split before '{token.text}': {' '.join(left_words)}| {token.text} {' '.join(right_words)}"
                     )
                     new_sentences.append(doc[start : token.i].text.strip())
                     start = token.i
@@ -166,8 +168,8 @@ def split_sentences_main(nlp):
     # delete the original file
     os.remove(SPLIT_BY_COMMA_FILE)
 
-    rprint(
-        f"[green]💾 Sentences split by connectors saved to →  `{SPLIT_BY_CONNECTOR_FILE}`[/green]"
+    logger.info(
+        f"Sentences split by connectors saved to →  `{SPLIT_BY_CONNECTOR_FILE}`"
     )
 
 

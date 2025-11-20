@@ -1,7 +1,6 @@
 import itertools
 import os
 import warnings
-from backend.utils import *
 from backend.spacy_utils.load_nlp_model import (
     init_nlp,
     SPLIT_BY_COMMA_FILE,
@@ -12,7 +11,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def is_valid_phrase(phrase):
-    # 🔍 Check for subject and verb
+    #  Check for subject and verb
     has_subject = any(
         token.dep_ in ["nsubj", "nsubjpass"] or token.pos_ == "PRON" for token in phrase
     )
@@ -28,7 +27,7 @@ def analyze_comma(start, doc, token):
         right_phrase
     )  # and is_valid_phrase(left_phrase) # ! no need to chekc left phrase
 
-    # 🚫 Remove punctuation and check word count
+    #  Remove punctuation and check word count
     left_words = [t for t in left_phrase if not t.is_punct]
     right_words = list(
         itertools.takewhile(lambda t: not t.is_punct, right_phrase)
@@ -40,19 +39,24 @@ def analyze_comma(start, doc, token):
     return suitable_for_splitting
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def split_by_comma(text, nlp):
     doc = nlp(text)
     sentences = []
     start = 0
 
     for i, token in enumerate(doc):
-        if token.text == "," or token.text == "，":
+        if token.text == "," or token.text == "":
             suitable_for_splitting = analyze_comma(start, doc, token)
 
             if suitable_for_splitting:
                 sentences.append(doc[start : token.i].text.strip())
-                rprint(
-                    f"[yellow] Split at comma: {doc[start:token.i][-4:]},| {doc[token.i + 1:][:4]}[/yellow]"
+                logger.debug(
+                    f"Split at comma: {doc[start:token.i][-4:]},| {doc[token.i + 1:][:4]}"
                 )
                 start = token.i + 1
 
@@ -77,9 +81,7 @@ def split_by_comma_main(nlp):
     # delete the original file
     os.remove(SPLIT_BY_MARK_FILE)
 
-    rprint(
-        f"[green] Sentences split by commas saved to →  `{SPLIT_BY_COMMA_FILE}`[/green]"
-    )
+    logger.info(f"Sentences split by commas saved to →  `{SPLIT_BY_COMMA_FILE}`")
 
 
 if __name__ == "__main__":
