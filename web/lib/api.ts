@@ -1,14 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
 const API_URL = `${API_BASE_URL}/audio`;
 
 export interface Task {
   task_id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   file_path?: string;
+  filename?: string;
   progress: number;
   message?: string;
+  duration?: number;
+  created_at?: string;
   result?: {
     segments: Segment[];
     srt: string;
@@ -46,6 +49,16 @@ export const api = {
 
   getResult: async (taskId: string) => {
     const response = await axios.get<{ task_id: string; segments: Segment[] }>(`${API_URL}/result/${taskId}`);
+    return response.data;
+  },
+
+  listTasks: async () => {
+    const response = await axios.get<Task[]>(`${API_URL}/tasks`);
+    return response.data;
+  },
+
+  deleteTask: async (taskId: string) => {
+    const response = await axios.delete(`${API_URL}/task/${taskId}`);
     return response.data;
   },
 

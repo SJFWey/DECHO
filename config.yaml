@@ -1,21 +1,17 @@
-# Config for Hearing App
-
-asr:
-  method: "parakeet"
-  parakeet_model_dir: "models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
-  enable_demucs: false
-  enable_vad: false
-
-llm:
-  api_key: "REDACTED_LLM_KEY"
-  base_url: "https://example-llm-provider.com/v1"
-  model: "gemini-2.5-flash"
-
 app:
   max_split_length: 80
-  use_llm: true
-  source_language: "en"
-  target_language: "de"
+  source_language: en
   spacy_model_map:
-    de: "de_core_news_md"
-    en: "en_core_web_md"
+    de: de_core_news_md
+    en: en_core_web_md
+  target_language: de
+  use_llm: true
+asr:
+  enable_demucs: false
+  enable_vad: false
+  method: parakeet
+  parakeet_model_dir: models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+llm:
+  api_key: REDACTED_LLM_KEY
+  base_url: https://example-llm-provider.com/v1
+  model: gemini-2.5-flash

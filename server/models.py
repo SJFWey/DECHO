@@ -16,6 +16,7 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String, default="pending")
     filename: Mapped[str] = mapped_column(String)
     filePath: Mapped[str] = mapped_column(String)
+    duration: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     progress: Mapped[float] = mapped_column(Float, default=0.0)
     message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string

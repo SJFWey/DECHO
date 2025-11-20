@@ -10,12 +10,18 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
+from datetime import datetime
+
+
 class TaskResponse(BaseModel):
     task_id: str
     status: TaskStatus
     message: Optional[str] = None
     progress: float = 0.0
     file_path: Optional[str] = None
+    filename: Optional[str] = None
+    duration: Optional[float] = None
+    created_at: Optional[datetime] = None
 
 
 class SubtitleSegment(BaseModel):

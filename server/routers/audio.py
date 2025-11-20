@@ -75,6 +75,7 @@ def process_audio_task(task_id: str):
         duration = last_timestamp if last_timestamp > 0 else file_duration
 
         segments[0]["end"] = duration
+        task.duration = duration
 
         refined_segments = split_sentences(segments, config)
         task.progress = 0.9
@@ -124,6 +125,9 @@ async def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_d
         message="File uploaded successfully",
         progress=new_task.progress,
         file_path=new_task.filePath,
+        filename=new_task.filename,
+        duration=new_task.duration,
+        created_at=new_task.createdAt,
     )
 
 
@@ -142,6 +146,9 @@ async def process_audio(
             message=task.message,
             progress=task.progress,
             file_path=task.filePath,
+            filename=task.filename,
+            duration=task.duration,
+            created_at=task.createdAt,
         )
 
     background_tasks.add_task(process_audio_task, task_id)
@@ -155,6 +162,9 @@ async def process_audio(
         message="Processing started",
         progress=task.progress,
         file_path=task.filePath,
+        filename=task.filename,
+        duration=task.duration,
+        created_at=task.createdAt,
     )
 
 
@@ -170,6 +180,9 @@ async def get_status(task_id: str, db: Session = Depends(get_db)):
         message=task.message,
         progress=task.progress,
         file_path=task.filePath,
+        filename=task.filename,
+        duration=task.duration,
+        created_at=task.createdAt,
     )
 
 
@@ -276,6 +289,46 @@ async def list_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_
             message=task.message,
             progress=task.progress,
             file_path=task.filePath,
+            filename=task.filename,
+            duration=task.duration,
+            created_at=task.createdAt,
         )
         for task in tasks
     ]
+
+
+@router.delete("/task/{task_id}")
+async def delete_task(task_id: str, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # 1. Delete practice recording files
+    # Note: PracticeRecording.filePath is stored as filename relative to output/user_recordings
+    recording_dir = "output/user_recordings"
+    # Ensure recordings are loaded
+    recordings = (
+        db.query(PracticeRecording).filter(PracticeRecording.taskId == task_id).all()
+    )
+
+    for recording in recordings:
+        if recording.filePath:
+            rec_path = os.path.join(recording_dir, recording.filePath)
+            if os.path.exists(rec_path):
+                try:
+                    os.remove(rec_path)
+                except Exception as e:
+                    logger.warning(f"Failed to delete recording file {rec_path}: {e}")
+
+    # 2. Delete task audio file
+    if task.filePath and os.path.exists(task.filePath):
+        try:
+            os.remove(task.filePath)
+        except Exception as e:
+            logger.warning(f"Failed to delete task file {task.filePath}: {e}")
+
+    # 3. Delete task from DB (cascades to recordings)
+    db.delete(task)
+    db.commit()
+
+    return {"message": "Task deleted successfully"}

@@ -115,10 +115,6 @@ export default function SettingsPage() {
               <Input id="base_url" {...register("llm.base_url")} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="base_url">Base URL</Label>
-              <Input id="base_url" {...register("llm.base_url")} />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="model">Model</Label>
               <Input id="model" {...register("llm.model")} placeholder="openai/gpt-4o" />
             </div>

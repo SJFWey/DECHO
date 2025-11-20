@@ -2,10 +2,270 @@ import logging
 from typing import Any, Dict, List
 
 from backend.llm import split_text_by_meaning
-from backend.spacy_utils.load_nlp_model import init_nlp
-from backend.spacy_utils.split_by_comma import split_by_comma
-from backend.spacy_utils.split_by_connector import split_by_connectors
-from backend.spacy_utils.split_long_by_root import split_long_sentence
+from backend.utils import load_config, get_joiner
+import spacy
+from spacy.cli.download import download
+import itertools
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+# --- Spacy Model Loading ---
+
+DEFAULT_SPACY_MODEL_MAP = {
+    "en": "en_core_web_md",
+    "zh": "zh_core_web_sm",
+    "de": "de_core_news_md",
+}
+
+_SPACY_CACHE: Dict[str, Any] = {}
+
+
+def get_spacy_model(language: str):
+    config = load_config()
+    model_map = config.get("app", {}).get("spacy_model_map", DEFAULT_SPACY_MODEL_MAP)
+    model = model_map.get(language.lower(), "en_core_web_md")
+    if language not in model_map:
+        logger.warning(
+            f"Spacy model does not support '{language}', using en_core_web_md model as fallback..."
+        )
+    return model
+
+
+def init_nlp(language: str = None):
+    global _SPACY_CACHE
+    try:
+        config = load_config()
+        if language is None:
+            language = config.get("app", {}).get("source_language", "en")
+
+        if language in _SPACY_CACHE:
+            return _SPACY_CACHE[language]
+
+        model = get_spacy_model(language)
+        logger.info(f"Loading NLP Spacy model for language '{language}': <{model}> ...")
+
+        try:
+            nlp = spacy.load(model)
+        except OSError:
+            logger.warning(f"Downloading {model} model...")
+            logger.warning(
+                "If download failed, please check your network and try again."
+            )
+            download(model)
+            nlp = spacy.load(model)
+
+        _SPACY_CACHE[language] = nlp
+        return nlp
+        return nlp
+    except Exception as e:
+        logger.error(f"Failed to load NLP model: {e}")
+        raise
+
+
+# --- Split by Comma ---
+
+
+def is_valid_phrase(phrase):
+    has_subject = any(
+        token.dep_ in ["nsubj", "nsubjpass"] or token.pos_ == "PRON" for token in phrase
+    )
+    has_verb = any((token.pos_ == "VERB" or token.pos_ == "AUX") for token in phrase)
+    return has_subject and has_verb
+
+
+def analyze_comma(start, doc, token):
+    left_phrase = doc[max(start, token.i - 9) : token.i]
+    right_phrase = doc[token.i + 1 : min(len(doc), token.i + 10)]
+
+    suitable_for_splitting = is_valid_phrase(right_phrase)
+
+    left_words = [t for t in left_phrase if not t.is_punct]
+    right_words = list(itertools.takewhile(lambda t: not t.is_punct, right_phrase))
+
+    if len(left_words) <= 3 or len(right_words) <= 3:
+        suitable_for_splitting = False
+
+    return suitable_for_splitting
+
+
+def split_by_comma(text, nlp):
+    doc = nlp(text)
+    sentences = []
+    start = 0
+
+    for i, token in enumerate(doc):
+        if token.text == "," or token.text == "":
+            suitable_for_splitting = analyze_comma(start, doc, token)
+            if suitable_for_splitting:
+                sentences.append(doc[start : token.i].text.strip())
+                start = token.i + 1
+
+    sentences.append(doc[start:].text.strip())
+    return [s for s in sentences if s]
+
+
+# --- Split by Connectors ---
+
+
+def analyze_connectors(doc, token):
+    lang = doc.lang_
+    if lang == "en":
+        connectors = ["that", "which", "where", "when", "because", "but", "and", "or"]
+        mark_dep = "mark"
+        det_pron_deps = ["det", "pron"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    elif lang == "zh":
+        connectors = ["", "", "", "", "", "", "", ""]
+        mark_dep = "mark"
+        det_pron_deps = ["det", "pron"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    elif lang == "ja":
+        connectors = ["", "", "", "", "", "", ""]
+        mark_dep = "mark"
+        det_pron_deps = ["case"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    elif lang == "fr":
+        connectors = ["que", "qui", "où", "quand", "parce que", "mais", "et", "ou"]
+        mark_dep = "mark"
+        det_pron_deps = ["det", "pron"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    elif lang == "ru":
+        connectors = ["что", "который", "где", "когда", "потому что", "но", "и", "или"]
+        mark_dep = "mark"
+        det_pron_deps = ["det"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    elif lang == "es":
+        connectors = ["que", "cual", "donde", "cuando", "porque", "pero", "y", "o"]
+        mark_dep = "mark"
+        det_pron_deps = ["det", "pron"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    elif lang == "de":
+        connectors = ["dass", "welche", "wo", "wann", "weil", "aber", "und", "oder"]
+        mark_dep = "mark"
+        det_pron_deps = ["det", "pron"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    elif lang == "it":
+        connectors = ["che", "quale", "dove", "quando", "perché", "ma", "e", "o"]
+        mark_dep = "mark"
+        det_pron_deps = ["det", "pron"]
+        verb_pos = "VERB"
+        noun_pos = ["NOUN", "PROPN"]
+    else:
+        return False, False
+
+    if token.text.lower() not in connectors:
+        return False, False
+
+    if lang == "en" and token.text.lower() == "that":
+        if token.dep_ == mark_dep and token.head.pos_ == verb_pos:
+            return True, False
+        else:
+            return False, False
+    elif token.dep_ in det_pron_deps and token.head.pos_ in noun_pos:
+        return False, False
+    else:
+        return True, False
+
+
+def split_by_connectors(text, context_words=5, nlp=None):
+    doc = nlp(text)
+    sentences = [doc.text]
+
+    while True:
+        split_occurred = False
+        new_sentences = []
+
+        for sent in sentences:
+            doc = nlp(sent)
+            start = 0
+
+            for i, token in enumerate(doc):
+                split_before, _ = analyze_connectors(doc, token)
+
+                if i + 1 < len(doc) and doc[i + 1].text in [
+                    "'s",
+                    "'re",
+                    "'ve",
+                    "'ll",
+                    "'d",
+                ]:
+                    continue
+
+                left_words = doc[max(0, token.i - context_words) : token.i]
+                right_words = doc[
+                    token.i + 1 : min(len(doc), token.i + context_words + 1)
+                ]
+
+                left_words = [word.text for word in left_words if not word.is_punct]
+                right_words = [word.text for word in right_words if not word.is_punct]
+
+                if (
+                    len(left_words) >= context_words
+                    and len(right_words) >= context_words
+                    and split_before
+                ):
+                    new_sentences.append(doc[start : token.i].text.strip())
+                    start = token.i
+                    split_occurred = True
+                    break
+
+            if start < len(doc):
+                new_sentences.append(doc[start:].text.strip())
+
+        if not split_occurred:
+            break
+
+        sentences = new_sentences
+
+    return sentences
+
+
+# --- Split Long by Root ---
+
+
+def split_long_sentence(doc):
+    tokens = [token.text for token in doc]
+    n = len(tokens)
+
+    dp = [float("inf")] * (n + 1)
+    dp[0] = 0
+    prev = [0] * (n + 1)
+
+    for i in range(1, n + 1):
+        for j in range(max(0, i - 100), i):
+            if i - j >= 30:
+                token = doc[i - 1]
+                if j == 0 or (
+                    token.is_sent_end
+                    or token.pos_ in ["VERB", "AUX"]
+                    or token.dep_ == "ROOT"
+                ):
+                    if dp[j] + 1 < dp[i]:
+                        dp[i] = dp[j] + 1
+                        prev[i] = j
+
+    sentences = []
+    i = n
+
+    config = load_config()
+    language = config.get("app", {}).get("target_language", "de")
+    joiner = get_joiner(language)
+
+    while i > 0:
+        j = prev[i]
+        sentences.append(joiner.join(tokens[j:i]).strip())
+        i = j
+
+    return sentences[::-1]
+
 
 logger = logging.getLogger(__name__)
 

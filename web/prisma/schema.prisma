@@ -15,6 +15,7 @@ model Task {
   status    String   @default("pending")
   filename  String
   filePath  String
+  duration  Float?
   progress  Float    @default(0.0)
   message   String?
   result    String?  // JSON string of segments

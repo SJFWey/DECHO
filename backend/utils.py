@@ -31,9 +31,14 @@ def setup_logging() -> None:
     )
 
 
-def load_config() -> Dict[str, Any]:
+_config_cache = None
+_config_mtime = 0
+
+
+def load_config(reload: bool = False) -> Dict[str, Any]:
     """
     Loads and validates the configuration from config.yaml.
+    Caches the configuration and reloads if the file changes or reload is True.
 
     Returns:
         Dict[str, Any]: The configuration dictionary.
@@ -41,13 +46,22 @@ def load_config() -> Dict[str, Any]:
     Raises:
         ConfigError: If the configuration file is missing or invalid.
     """
+    global _config_cache, _config_mtime
+
     config_path = "config.yaml"
     if not os.path.exists(config_path):
         raise ConfigError(f"Configuration file not found: {config_path}")
 
     try:
+        current_mtime = os.path.getmtime(config_path)
+        if _config_cache is not None and not reload and current_mtime == _config_mtime:
+            return _config_cache
+
         with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
+            _config_cache = config
+            _config_mtime = current_mtime
+            return config
 
         # Basic validation
         if "asr" not in config or "app" not in config:

@@ -59,6 +59,9 @@ def _find_split_points(
     """
     Finds indices to split audio at silence points near chunk boundaries.
     Returns a list of sample indices including 0 and len(audio).
+
+    TODO: The custom VAD here works but is "reinventing the wheel";
+    please consider sherpa-onnx's VAD later.
     """
     total_samples = len(audio)
     chunk_samples = chunk_duration_sec * sample_rate
@@ -215,8 +218,6 @@ class ParakeetASR:
 
         logger.info(f"Transcribing audio: {audio_file}")
 
-        # Explicitly cast the result of sf.read to avoid type checking issues
-        # where it might be inferred as NoReturn or untyped.
         audio, sample_rate = cast(
             Tuple[np.ndarray, int], sf.read(audio_file, dtype="float32")
         )
@@ -321,9 +322,24 @@ class ParakeetASR:
         return {"text": full_text, "timestamps": all_timestamps, "tokens": all_tokens}
 
 
+_ASR_INSTANCE: Optional[ParakeetASR] = None
+
+
+def get_asr_instance() -> ParakeetASR:
+    """
+    Returns a singleton instance of ParakeetASR.
+    Initializes it if it doesn't exist.
+    """
+    global _ASR_INSTANCE
+    if _ASR_INSTANCE is None:
+        _ASR_INSTANCE = ParakeetASR()
+    return _ASR_INSTANCE
+
+
 def transcribe_audio(audio_path: str) -> Dict[str, Any]:
     """
     Convenience helper to instantiate ParakeetASR and run transcription.
+    Uses a singleton instance to avoid reloading the model on every call.
 
     Args:
         audio_path (str): Path to the input audio file.
@@ -331,5 +347,5 @@ def transcribe_audio(audio_path: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Structured transcription output.
     """
-    asr = ParakeetASR()
+    asr = get_asr_instance()
     return asr.transcribe(audio_path)
