@@ -1,11 +1,7 @@
 import itertools
 import os
 import warnings
-from backend.spacy_utils.load_nlp_model import (
-    init_nlp,
-    SPLIT_BY_COMMA_FILE,
-    SPLIT_BY_MARK_FILE,
-)
+from backend.spacy_utils.load_nlp_model import init_nlp
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -62,31 +58,3 @@ def split_by_comma(text, nlp):
 
     sentences.append(doc[start:].text.strip())
     return sentences
-
-
-def split_by_comma_main(nlp):
-
-    with open(SPLIT_BY_MARK_FILE, "r", encoding="utf-8") as input_file:
-        sentences = input_file.readlines()
-
-    all_split_sentences = []
-    for sentence in sentences:
-        split_sentences = split_by_comma(sentence.strip(), nlp)
-        all_split_sentences.extend(split_sentences)
-
-    with open(SPLIT_BY_COMMA_FILE, "w", encoding="utf-8") as output_file:
-        for sentence in all_split_sentences:
-            output_file.write(sentence + "\n")
-
-    # delete the original file
-    os.remove(SPLIT_BY_MARK_FILE)
-
-    logger.info(f"Sentences split by commas saved to →  `{SPLIT_BY_COMMA_FILE}`")
-
-
-if __name__ == "__main__":
-    nlp = init_nlp()
-    split_by_comma_main(nlp)
-    # nlp = init_nlp()
-    # test = "So in the same frame, right there, almost in the exact same spot on the ice, Brown has committed himself, whereas McDavid has not."
-    # print(split_by_comma(test, nlp))

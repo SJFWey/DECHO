@@ -3,6 +3,8 @@
 asr:
   method: "parakeet"
   parakeet_model_dir: "models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+  enable_demucs: false
+  enable_vad: false
 
 llm:
   api_key: "REDACTED_LLM_KEY"
@@ -11,3 +13,8 @@ llm:
 
 app:
   max_split_length: 80
+  use_llm: true
+  target_language: "de"
+  spacy_model_map:
+    de: "de_core_news_md"
+    en: "en_core_web_md"

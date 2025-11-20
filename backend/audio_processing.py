@@ -5,6 +5,7 @@ import subprocess
 from typing import Optional
 
 from backend.exceptions import AudioConversionError
+from backend.utils import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,55 @@ def _ffmpeg_binary() -> Optional[str]:
     return shutil.which("ffmpeg")
 
 
+def apply_demucs(input_path: str) -> str:
+    """
+    Apply Demucs to separate vocals from the audio.
+    Returns the path to the separated vocals file.
+    """
+    logger.info(f"Applying Demucs to: {input_path}")
+
+    # Check if demucs is installed
+    if not shutil.which("demucs"):
+        logger.warning("Demucs is enabled but not found in PATH. Skipping Demucs.")
+        return input_path
+
+    output_dir = os.path.join(os.path.dirname(input_path), "separated")
+    os.makedirs(output_dir, exist_ok=True)
+
+    cmd = [
+        "demucs",
+        "-n",
+        "htdemucs",
+        input_path,
+        "-o",
+        output_dir,
+    ]
+
+    try:
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Construct expected path: output_dir/htdemucs/{filename_without_ext}/vocals.wav
+        filename = os.path.splitext(os.path.basename(input_path))[0]
+        vocals_path = os.path.join(output_dir, "htdemucs", filename, "vocals.wav")
+
+        if os.path.exists(vocals_path):
+            logger.info(f"Demucs separation successful: {vocals_path}")
+            return vocals_path
+        else:
+            logger.error(f"Demucs output not found at: {vocals_path}")
+            return input_path
+
+    except subprocess.CalledProcessError as exc:
+        error_msg = exc.stderr.decode().strip() if exc.stderr else str(exc)
+        logger.error(f"Demucs failed: {error_msg}")
+        return input_path
+
+
 def convert_to_wav(input_path: str) -> str:
     """
     Convert an arbitrary audio file to a mono 16 kHz WAV file.
@@ -36,6 +86,15 @@ def convert_to_wav(input_path: str) -> str:
         AudioConversionError: Raised when conversion fails for all available backends.
     """
     logger.info(f"Converting audio: {input_path}")
+
+    # Check for Demucs
+    try:
+        config = load_config()
+        if config.get("asr", {}).get("enable_demucs", False):
+            input_path = apply_demucs(input_path)
+    except Exception as e:
+        logger.warning(f"Failed to load config or apply Demucs: {e}")
+
     output_path = os.path.splitext(input_path)[0] + ".wav"
 
     if os.path.abspath(input_path) == os.path.abspath(output_path):

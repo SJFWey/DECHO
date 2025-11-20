@@ -1,9 +1,11 @@
 import logging
 import spacy
-from spacy.cli import download
+from spacy.cli.download import download
 from backend.utils import load_config
 
 logger = logging.getLogger(__name__)
+
+SPLIT_BY_MARK_FILE = "output/log/split_by_mark.txt"
 
 # Default map if not in config
 DEFAULT_SPACY_MODEL_MAP = {
@@ -50,11 +52,3 @@ def init_nlp():
     except Exception as e:
         logger.error(f"Failed to load NLP Spacy model: {e}")
         raise e
-
-
-# --------------------
-# define the intermediate files
-# --------------------
-SPLIT_BY_COMMA_FILE = "output/log/split_by_comma.txt"
-SPLIT_BY_CONNECTOR_FILE = "output/log/split_by_connector.txt"
-SPLIT_BY_MARK_FILE = "output/log/split_by_mark.txt"

@@ -2,8 +2,8 @@ import logging
 import os
 import string
 import warnings
-from backend.spacy_utils.load_nlp_model import init_nlp, SPLIT_BY_CONNECTOR_FILE
-from backend.utils import load_config, get_joiner, _3_1_SPLIT_BY_NLP
+from backend.spacy_utils.load_nlp_model import init_nlp
+from backend.utils import load_config, get_joiner
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +61,8 @@ def split_extremely_long_sentence(doc):
     part_length = n // num_parts
 
     sentences = []
-    whisper_language = load_key("whisper.language")
-    language = (
-        load_key("whisper.detected_language")
-        if whisper_language == "auto"
-        else whisper_language
-    )  # consider force english case
+    config = load_config()
+    language = config.get("app", {}).get("target_language", "de")
     joiner = get_joiner(language)
     for i in range(num_parts):
         start = i * part_length
@@ -75,29 +71,6 @@ def split_extremely_long_sentence(doc):
         sentences.append(sentence)
 
     return sentences
-
-
-def split_long_by_root_main(nlp):
-    with open(SPLIT_BY_CONNECTOR_FILE, "r", encoding="utf-8") as input_file:
-        sentences = input_file.readlines()
-
-    all_split_sentences = []
-    for sentence in sentences:
-        doc = nlp(sentence.strip())
-        if len(doc) > 60:
-            split_sentences = split_long_sentence(doc)
-            if any(len(nlp(sent)) > 60 for sent in split_sentences):
-                split_sentences = [
-                    subsent
-                    for sent in split_sentences
-                    for subsent in split_extremely_long_sentence(nlp(sent))
-                ]
-            all_split_sentences.extend(split_sentences)
-            rprint(
-                f"[yellow]  Splitting long sentences by root: {sentence[:30]}...[/yellow]"
-            )
-        else:
-            all_split_sentences.append(sentence.strip())
 
     punctuation = (
         string.punctuation + "'" + '"'

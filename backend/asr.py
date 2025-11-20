@@ -1,5 +1,7 @@
 import logging
 import os
+import sys
+import subprocess
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
@@ -119,16 +121,49 @@ class ParakeetASR:
         if not sherpa_onnx:
             raise ImportError("sherpa-onnx is required for Parakeet ASR.")
 
+        config = load_config()
         if model_dir is None:
-            config = load_config()
             model_dir = config.get("asr", {}).get(
                 "parakeet_model_dir",
                 "models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
             )
 
         self.model_dir = model_dir
+        self.enable_vad = config.get("asr", {}).get("enable_vad", False)
         self.expected_sample_rate = 16000
+
+        self._check_assets()
         self._init_recognizer()
+
+    def _check_assets(self) -> None:
+        """
+        Check if model assets exist, and if not, attempt to download them.
+        """
+        if not self.model_dir:
+            return
+
+        required_files = [
+            "encoder.int8.onnx",
+            "decoder.int8.onnx",
+            "joiner.int8.onnx",
+            "tokens.txt",
+        ]
+        missing = any(
+            not os.path.exists(os.path.join(self.model_dir, f)) for f in required_files
+        )
+
+        if missing:
+            logger.info(
+                f"Model assets missing in {self.model_dir}. Attempting to download..."
+            )
+            try:
+                script_path = os.path.join("scripts", "download_models.py")
+                if os.path.exists(script_path):
+                    subprocess.run([sys.executable, script_path], check=True)
+                else:
+                    logger.error(f"Download script not found at {script_path}")
+            except Exception as e:
+                logger.error(f"Failed to download model: {e}")
 
     def _init_recognizer(self) -> None:
         """
@@ -217,6 +252,10 @@ class ParakeetASR:
             logger.info("Audio is long (>60s), using chunked processing.")
             return self._transcribe_long_audio(audio, sample_rate)
 
+        # TODO: Implement VAD preprocessing if enabled to remove silence
+        if self.enable_vad:
+            logger.info("VAD is enabled but not yet fully implemented for short audio.")
+
         stream = self.recognizer.create_stream()
         stream.accept_waveform(sample_rate, audio)
         self.recognizer.decode_stream(stream)
@@ -236,6 +275,12 @@ class ParakeetASR:
         """
         Process long audio by splitting into chunks at silence points.
         """
+        if self.enable_vad:
+            # Placeholder for VAD-based splitting
+            logger.info(
+                "Using VAD for splitting (falling back to energy-based for now)"
+            )
+
         split_indices = _find_split_points(audio, sample_rate, chunk_duration_sec=60)
 
         full_text_parts = []
