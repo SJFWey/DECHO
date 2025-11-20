@@ -1,0 +1,63 @@
+from pydantic import BaseModel
+from typing import List, Optional, Dict
+from enum import Enum
+
+
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class TaskResponse(BaseModel):
+    task_id: str
+    status: TaskStatus
+    message: Optional[str] = None
+    progress: float = 0.0
+    file_path: Optional[str] = None
+
+
+class SubtitleSegment(BaseModel):
+    start: float
+    end: float
+    text: str
+    translation: Optional[str] = None
+
+
+class SubtitleResponse(BaseModel):
+    task_id: str
+    segments: List[SubtitleSegment]
+
+
+class ASRConfig(BaseModel):
+    method: str
+    parakeet_model_dir: str
+    enable_demucs: bool
+    enable_vad: bool
+
+
+class LLMConfig(BaseModel):
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+class AppConfig(BaseModel):
+    max_split_length: int
+    use_llm: bool
+    source_language: str
+    target_language: str
+    spacy_model_map: Dict[str, str]
+
+
+class ConfigResponse(BaseModel):
+    asr: ASRConfig
+    llm: LLMConfig
+    app: AppConfig
+
+
+class ConfigUpdate(BaseModel):
+    asr: Optional[ASRConfig] = None
+    llm: Optional[LLMConfig] = None
+    app: Optional[AppConfig] = None

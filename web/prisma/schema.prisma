@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id        String   @id @default(uuid())
+  status    String   @default("pending")
+  filename  String
+  filePath  String
+  progress  Float    @default(0.0)
+  message   String?
+  result    String?  // JSON string of segments
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  recordings PracticeRecording[]
+}
+
+model PracticeRecording {
+  id           String   @id @default(uuid())
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  segmentIndex Int
+  filePath     String
+  createdAt    DateTime @default(now())
+}

@@ -23,3 +23,7 @@ output/
 models/
 .powershell_profile.ps1
 .python-version
+*.db
+*.sqlite3
+.ipynb_checkpoints/
+config.yaml

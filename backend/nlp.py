@@ -127,7 +127,10 @@ def split_sentences(
         List[Dict[str, Any]]: List of refined segments with interpolated timestamps.
     """
     logger.info("Starting NLP sentence splitting...")
-    nlp = init_nlp()
+
+    source_lang = config.get("app", {}).get("source_language", "en")
+    nlp = init_nlp(language=source_lang)
+
     max_len = config.get("app", {}).get("max_split_length", 80)
     use_llm = config.get("app", {}).get("use_llm", False)
     logger.debug(f"Max split length set to: {max_len}, Use LLM: {use_llm}")

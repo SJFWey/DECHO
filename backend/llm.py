@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def chat_completion(
-    messages: List[Dict[str, str]], model: Optional[str] = None
+    messages: List[Dict[str, str]],
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Sends a chat completion request to the LLM API.
@@ -19,6 +22,8 @@ def chat_completion(
     Args:
         messages (List[Dict[str, str]]): List of message dictionaries.
         model (Optional[str]): Model name to use. Defaults to config.
+        api_key (Optional[str]): API key to use. Defaults to config/env.
+        base_url (Optional[str]): Base URL to use. Defaults to config.
 
     Returns:
         Optional[Dict[str, Any]]: The JSON response from the API, or None if failed.
@@ -26,9 +31,9 @@ def chat_completion(
     config = load_config()
     llm_config = config.get("llm", {})
 
-    # Prioritize environment variable for API key
-    api_key = os.getenv("LLM_API_KEY") or llm_config.get("api_key")
-    base_url = llm_config.get("base_url", "https://example-llm-provider.com/v1")
+    # Prioritize argument -> environment variable -> config
+    api_key = api_key or os.getenv("LLM_API_KEY") or llm_config.get("api_key")
+    base_url = base_url or llm_config.get("base_url", "https://example-llm-provider.com/v1")
     default_model = llm_config.get("model", "openai/gpt-4o")
 
     if not api_key:

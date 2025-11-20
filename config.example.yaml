@@ -7,7 +7,7 @@ asr:
   enable_vad: false
 
 llm:
-  api_key: "REDACTED_LLM_KEY"
+  api_key: "YOUR_API_KEY_HERE"
   base_url: "https://example-llm-provider.com/v1"
   model: "gemini-2.5-flash"
 
@@ -18,4 +18,3 @@ app:
   target_language: "de"
   spacy_model_map:
     de: "de_core_news_md"
-    en: "en_core_web_md"

@@ -28,14 +28,15 @@ def get_spacy_model(language: str):
     return model
 
 
-def init_nlp():
+def init_nlp(language: str = None):
     try:
         config = load_config()
-        # Determine language: prioritize target_language, fallback to 'de' for this app
-        language = config.get("app", {}).get("target_language", "de")
+        # Determine language: prioritize argument, then source_language, fallback to 'en'
+        if language is None:
+            language = config.get("app", {}).get("source_language", "en")
 
         model = get_spacy_model(language)
-        logger.info(f"Loading NLP Spacy model: <{model}> ...")
+        logger.info(f"Loading NLP Spacy model for language '{language}': <{model}> ...")
 
         try:
             nlp = spacy.load(model)

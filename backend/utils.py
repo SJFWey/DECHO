@@ -48,19 +48,29 @@ def load_config() -> Dict[str, Any]:
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
+
+        # Basic validation
+        if "asr" not in config or "app" not in config:
+            raise ConfigError("Invalid config: missing 'asr' or 'app' sections")
+
+        return config
     except yaml.YAMLError as e:
-        raise ConfigError(f"Error parsing config.yaml: {e}")
+        raise ConfigError(f"Error parsing config file: {e}")
 
-    if not config:
-        raise ConfigError("Configuration file is empty.")
 
-    # Validation
-    required_sections = ["asr", "app"]
-    for section in required_sections:
-        if section not in config:
-            raise ConfigError(f"Missing required section '{section}' in config.yaml")
+def save_config(config: Dict[str, Any]) -> None:
+    """
+    Saves the configuration to config.yaml.
 
-    return config
+    Args:
+        config (Dict[str, Any]): The configuration dictionary to save.
+    """
+    config_path = "config.yaml"
+    try:
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+    except Exception as e:
+        raise ConfigError(f"Error saving config file: {e}")
 
 
 def get_joiner(language: str) -> str:
