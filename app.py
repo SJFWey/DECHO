@@ -4,8 +4,9 @@ import tempfile
 import soundfile as sf
 from backend.audio_processing import convert_to_wav
 from backend.asr import transcribe_audio
-from backend.llm import split_text_by_meaning
-import json
+from backend.nlp import split_sentences
+from backend.subtitle import generate_srt
+
 
 st.set_page_config(page_title="Hearing App", layout="wide")
 
@@ -65,7 +66,7 @@ if uploaded_file:
                 st.stop()
 
             # 2. ASR
-            st.write("Running ASR (Locally using Parakeet V3)...")
+            st.write("Running ASR...")
             try:
                 asr_result = transcribe_audio(wav_path)
                 # Handle result format
@@ -87,35 +88,50 @@ if uploaded_file:
                 st.markdown(f""" **Error Details:** `{str(e)}` """)
                 st.stop()
 
-            # 3. NLP/LLM Splitting
+            # 3. NLP Splitting
             st.write("Splitting sentences...")
             try:
-                # If we have timestamps, we might want to align them, but for now let's just split the text
-                # Ideally we would use the timestamps to split the audio, but here we just split text for display
-
-                # If the text is very long, we might need to chunk it for LLM
                 if not full_text.strip():
-                    st.warning("ASR produced empty text. Skipping LLM splitting.")
-                    segments = []
+                    st.warning("ASR produced empty text. Skipping splitting.")
+                    final_segments = []
                 else:
-                    segments = split_text_by_meaning(full_text)
-                    st.success("Splitting Complete!")
+                    # Create a single initial segment using the total duration
+                    duration = sf.info(wav_path).duration
+                    initial_segments = [
+                        {"text": full_text, "start": 0.0, "end": duration}
+                    ]
+
+                    # Config for NLP (could be moved to sidebar)
+                    config = {"app": {"max_split_length": 80}}
+
+                    final_segments = split_sentences(initial_segments, config)
+
+                st.success(
+                    f"Splitting Complete! Generated {len(final_segments)} segments."
+                )
+
             except Exception as e:
-                st.error(f"LLM Splitting Failed: {e}")
-                segments = [full_text]
+                st.error(f"Splitting Failed: {e}")
+                import traceback
+
+                st.text(traceback.format_exc())
+                st.stop()
 
             status.update(
                 label="Processing Complete!", state="complete", expanded=False
             )
 
         # Display Results
-        if segments:
-            # Export options
+        if "final_segments" in locals() and final_segments:
+            # Generate SRT
+            srt_content = generate_srt(final_segments)
+
+            st.subheader("Generated Subtitles")
+
+            st.text_area("SRT", srt_content, height=300)
             st.download_button(
-                label="Download Subtitles (JSON)",
-                data=json.dumps(segments, indent=2, ensure_ascii=False),
-                file_name="subtitles.json",
-                mime="application/json",
+                label="Download Subtitles (SRT)",
+                data=srt_content,
+                file_name="subtitles.srt",
+                mime="text/plain",
             )
-        else:
-            st.info("Output error, please check the input or try again.")

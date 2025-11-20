@@ -30,3 +30,6 @@ def except_handler(msg):
         return wrapper
 
     return decorator
+
+
+_3_1_SPLIT_BY_NLP = "output/log/split_by_nlp.txt"
