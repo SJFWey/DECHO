@@ -7,7 +7,6 @@ requires-python = ">=3.13.1"
 dependencies = [
     "numpy>=2.3.5",
     "pip>=25.3",
-    "pydub>=0.25.1",
     "pyyaml>=6.0.3",
     "requests>=2.32.5",
     "sherpa-onnx>=1.12.17",

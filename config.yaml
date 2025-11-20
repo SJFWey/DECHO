@@ -5,9 +5,9 @@ asr:
   parakeet_model_dir: "models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
 
 llm:
-  api_key: "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"
-  base_url: "https://openrouter.ai/api/v1"
-  model: "google/gemini-2.0-flash-001"
+  api_key: "REDACTED_LLM_KEY"
+  base_url: "https://example-llm-provider.com/v1"
+  model: "gemini-2.5-flash"
 
 app:
   max_split_length: 80

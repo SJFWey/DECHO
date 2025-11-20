@@ -9,12 +9,12 @@ import json
 
 st.set_page_config(page_title="Hearing App", layout="wide")
 
-st.title("Hearing App - Local ASR & OpenRouter LLM")
+st.title("Hearing App - Local ASR & LLM")
 
 # Sidebar for settings
 with st.sidebar:
     st.header("Settings")
-    st.info("Using Local Parakeet Model & OpenRouter API")
+    st.info("Using Local Parakeet Model & LLM")
 
 # File Upload
 uploaded_file = st.file_uploader("Upload Audio File", type=["mp3", "wav", "m4a", "mp4"])
@@ -35,7 +35,6 @@ if uploaded_file:
             st.write("Converting audio...")
             try:
                 wav_path = convert_to_wav(input_path)
-                st.write(f"Converted to: {wav_path}")
 
                 # Diagnostics for the converted file
                 try:
@@ -66,7 +65,7 @@ if uploaded_file:
                 st.stop()
 
             # 2. ASR
-            st.write("Running ASR (Local Parakeet)...")
+            st.write("Running ASR (Locally using Parakeet V3)...")
             try:
                 asr_result = transcribe_audio(wav_path)
                 # Handle result format
@@ -84,24 +83,12 @@ if uploaded_file:
                 st.error(f"ASR Failed: {e}")
 
                 st.markdown("---")
-                st.error("### ❌ Troubleshooting Analysis")
-                st.markdown(f"""
-                **Error Details:** `{str(e)}`
-                
-                **Possible Causes:**
-                1. **Audio Format Issue:** If you see `BroadcastIterator` or `Add node` errors, the audio shape/length might be confusing the model.
-                2. **Sample Rate Mismatch:** The model expects 16kHz. If the conversion failed to produce this, the model crashes.
-                3. **Silent/Empty Audio:** If the audio has no speech or is pure silence/noise, the decoder might fail.
-                
-                **Suggestions:**
-                - Check the **Audio Diagnostics** above. Is the duration reasonable? Is it 16kHz?
-                - Try converting the audio to **16kHz Mono WAV** using an external tool (like Audacity or ffmpeg) before uploading.
-                - Ensure the audio file is not corrupted.
-                """)
+                st.error("### Troubleshooting Analysis")
+                st.markdown(f""" **Error Details:** `{str(e)}` """)
                 st.stop()
 
             # 3. NLP/LLM Splitting
-            st.write("Splitting sentences (OpenRouter LLM)...")
+            st.write("Splitting sentences...")
             try:
                 # If we have timestamps, we might want to align them, but for now let's just split the text
                 # Ideally we would use the timestamps to split the audio, but here we just split text for display
@@ -123,12 +110,6 @@ if uploaded_file:
 
         # Display Results
         if segments:
-            st.header("Results")
-
-            # Create a simple subtitle view
-            for i, seg in enumerate(segments):
-                st.markdown(f"**{i + 1}.** {seg}")
-
             # Export options
             st.download_button(
                 label="Download Subtitles (JSON)",
@@ -137,8 +118,4 @@ if uploaded_file:
                 mime="application/json",
             )
         else:
-            st.info("No text to display.")
-
-        # Cleanup
-        # os.remove(input_path)
-        # os.remove(wav_path)
+            st.info("Output error, please check the input or try again.")

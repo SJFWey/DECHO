@@ -44,43 +44,30 @@ def convert_to_wav(input_path: str) -> str:
 
     ffmpeg_bin = _ffmpeg_binary()
 
-    ffmpeg_error: Optional[Exception] = None
-    if ffmpeg_bin:
-        cmd = [
-            ffmpeg_bin,
-            "-y",
-            "-i",
-            input_path,
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            output_path,
-        ]
-        try:
-            subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            return output_path
-        except subprocess.CalledProcessError as exc:
-            ffmpeg_error = exc
-            print(f"ffmpeg conversion failed: {exc}")
-    else:
-        print(
-            "ffmpeg executable not found. Set FFMPEG_BINARY env var or add ffmpeg to PATH to avoid pydub fallback."
+    if not ffmpeg_bin:
+        raise AudioConversionError(
+            "ffmpeg executable not found. Please install ffmpeg and add it to your PATH."
         )
 
+    cmd = [
+        ffmpeg_bin,
+        "-y",
+        "-i",
+        input_path,
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        output_path,
+    ]
     try:
-        from pydub import AudioSegment
-
-        audio = AudioSegment.from_file(input_path)
-        audio = audio.set_frame_rate(16000).set_channels(1)
-        audio.export(output_path, format="wav")
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         return output_path
-    except Exception as exc:  # noqa: BLE001
-        raise AudioConversionError(
-            "Failed to convert audio to WAV. Please provide a standard PCM/MP3/M4A file."
-        ) from (exc if ffmpeg_error is None else ffmpeg_error)
+    except subprocess.CalledProcessError as exc:
+        error_msg = exc.stderr.decode().strip() if exc.stderr else str(exc)
+        raise AudioConversionError(f"ffmpeg conversion failed: {error_msg}") from exc

@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 import soundfile as sf
@@ -95,7 +95,7 @@ def _find_split_points(
             split_offset = (min_energy_idx * window_size) + (window_size // 2)
             split_idx = search_start + split_offset
 
-        split_points.append(split_idx)
+        split_points.append(int(split_idx))
         current_start = split_idx
 
     split_points.append(total_samples)
@@ -131,6 +131,9 @@ class ParakeetASR:
         """
         if sherpa_onnx is None:
             raise ImportError("sherpa-onnx is not installed")
+
+        if not self.model_dir:
+            raise ValueError("Model directory is not set")
 
         encoder_path = os.path.join(self.model_dir, "encoder.int8.onnx")
         decoder_path = os.path.join(self.model_dir, "decoder.int8.onnx")
@@ -169,7 +172,11 @@ class ParakeetASR:
         if not os.path.exists(audio_file):
             raise FileNotFoundError(f"Audio file not found: {audio_file}")
 
-        audio, sample_rate = sf.read(audio_file, dtype="float32")
+        # Explicitly cast the result of sf.read to avoid type checking issues
+        # where it might be inferred as NoReturn or untyped.
+        audio, sample_rate = cast(
+            Tuple[np.ndarray, int], sf.read(audio_file, dtype="float32")
+        )
 
         print(
             f"[DEBUG] Original audio shape: {audio.shape}, dtype: {audio.dtype}, sample_rate: {sample_rate}Hz"
