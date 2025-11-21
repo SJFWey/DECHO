@@ -1,15 +1,14 @@
 import axios from 'axios';
 
 const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem("api_base_url");
-    if (stored) return stored;
-    // Fallback to window variable if set directly
-    if ((window as any).__TAURI_PY_PORT__) {
-        return `http://127.0.0.1:${(window as any).__TAURI_PY_PORT__}/api`;
-    }
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
-  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
+  if (typeof window !== 'undefined') {
+    // When served by the backend, use relative path
+    return '/api';
+  }
+  return 'http://127.0.0.1:8000/api';
 };
 
 const getApiUrl = () => `${getBaseUrl()}/audio`;

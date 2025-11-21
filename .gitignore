@@ -7,7 +7,7 @@ __pycache__/
 *.wav
 *.mp3
 .env
-.env.*
+!.env.example
 .venv/
 .pytest_cache/
 .mypy_cache/
@@ -26,5 +26,4 @@ models/
 *.db
 *.sqlite3
 .ipynb_checkpoints/
-config.yaml
 /docs

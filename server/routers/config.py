@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from server.schemas import ConfigResponse, ConfigUpdate
-from backend.utils import load_config, save_config
+from backend.utils import load_config
 from backend.exceptions import ConfigError
 
 router = APIRouter()
@@ -20,50 +20,15 @@ async def get_config():
 
 @router.patch("/", response_model=ConfigResponse)
 async def update_config(config_update: ConfigUpdate):
-    try:
-        current_config = load_config()
-
-        # Update fields if provided
-        if config_update.asr:
-            current_config["asr"].update(
-                config_update.asr.model_dump(exclude_unset=True)
-            )
-
-        if config_update.llm:
-            if "llm" not in current_config:
-                current_config["llm"] = {}
-
-            update_data = config_update.llm.model_dump(exclude_unset=True)
-            # Don't update api_key if it's the masked value
-            if update_data.get("api_key") == "********":
-                del update_data["api_key"]
-
-            current_config["llm"].update(update_data)
-
-        if config_update.tts:
-            if "tts" not in current_config:
-                current_config["tts"] = {}
-
-            update_data = config_update.tts.model_dump(exclude_unset=True)
-            # Don't update api_key if it's the masked value
-            if update_data.get("api_key") == "********":
-                del update_data["api_key"]
-
-            current_config["tts"].update(update_data)
-
-        if config_update.app:
-            current_config["app"].update(
-                config_update.app.model_dump(exclude_unset=True)
-            )
-
-        save_config(current_config)
-        return current_config
-    except ConfigError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to update config: {str(e)}"
-        )
+    """
+    Configuration is now managed via environment variables (.env file).
+    This endpoint is deprecated and returns a helpful message.
+    """
+    raise HTTPException(
+        status_code=400,
+        detail="Configuration updates are no longer supported via API. "
+        "Please update your .env file and restart the application.",
+    )
 
 
 @router.post("/test-llm")
@@ -108,7 +73,7 @@ async def test_llm(config_update: ConfigUpdate):
         if hasattr(e, "response") and e.response is not None:
             try:
                 error_detail += f" - Response: {e.response.text}"
-            except:
+            except Exception:
                 pass
         raise HTTPException(status_code=500, detail=error_detail)
 
@@ -157,7 +122,7 @@ async def test_tts(config_update: ConfigUpdate):
         if hasattr(e, "response") and e.response is not None:
             try:
                 error_detail += f" - Response: {e.response.text}"
-            except:
+            except Exception:
                 pass
         raise HTTPException(
             status_code=500, detail=f"TTS Connection failed: {error_detail}"

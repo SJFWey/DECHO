@@ -49,7 +49,74 @@ app.mount(
 app.include_router(audio.router, prefix="/api/audio", tags=["audio"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 
+import sys
+from fastapi.responses import FileResponse
 
-@app.get("/")
-async def root():
-    return {"message": "Hearing API is running"}
+# Determine base directory
+if getattr(sys, "frozen", False):
+    base_dir = os.path.dirname(sys.executable)
+else:
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+frontend_dist_name = "web" if getattr(sys, "frozen", False) else "web/out"
+frontend_path = os.path.join(base_dir, frontend_dist_name)
+
+if os.path.exists(frontend_path):
+    # Mount _next static files
+    next_static_path = os.path.join(frontend_path, "_next")
+    if os.path.exists(next_static_path):
+        app.mount("/_next", StaticFiles(directory=next_static_path), name="next")
+
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(os.path.join(frontend_path, "index.html"))
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file_path = os.path.join(frontend_path, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        # Fallback to index.html for SPA routing
+        return FileResponse(os.path.join(frontend_path, "index.html"))
+
+else:
+    logger.warning(f"Frontend not found at {frontend_path}")
+
+    @app.get("/")
+    async def root():
+        return {"message": "Hearing API is running (Frontend not found)"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    import webbrowser
+    import socket
+    import threading
+    import time
+
+    if getattr(sys, "frozen", False):
+        os.chdir(base_dir)
+        logger.info(f"Running in frozen mode. CWD set to: {base_dir}")
+
+    def find_free_port():
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            return s.getsockname()[1]
+
+    port = 8000
+    # Check if 8000 is free
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(("localhost", port)) == 0:
+            # Port is open (in use), find another
+            port = find_free_port()
+
+    def open_browser():
+        time.sleep(1.5)
+        webbrowser.open(f"http://localhost:{port}")
+
+    print(f"Starting server at http://localhost:{port}")
+    threading.Thread(target=open_browser, daemon=True).start()
+
+    uvicorn.run(app, host="127.0.0.1", port=port)

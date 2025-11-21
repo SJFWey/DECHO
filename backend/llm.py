@@ -89,16 +89,15 @@ def split_text_by_meaning(text: str, max_length: int = 80) -> List[str]:
         List[str]: List of text segments.
     """
     prompt = f"""
-    Split the following text into smaller, meaningful segments for subtitle generation.
+    Split the following German text into smaller, meaningful segments for subtitle generation.
     
-    IMPORTANT: 
-    1. Do **NOT** correct any grammar errors.
-    2. Correct spelling mistakes, since the text was transcribed by ASR.
-    3. Prefer to split at natural pauses like commas, periods, or punctuation. (suitable for language learning.)
-    4. The output must be a JSON list of strings that, when joined, exactly matches the input text (ignoring whitespace).
-    
-    Each segment should be roughly under {max_length} characters if possible, but prioritize meaning.
-    Return the result as a JSON list of strings.
+    Rules:
+    1. **Sentence Flow Completeness**: Ensure each segment is a complete thought or a fluent phrase. Do not break the flow abruptly.
+    2. **Maximum Chunk Size**: A single complete sentence is the MAXIMUM size for a chunk. Never combine multiple sentences into one chunk.
+    3. **Splitting Long Sentences**: If a sentence is too long (>{max_length} chars), split it at natural pauses (commas, conjunctions) to maintain fluency.
+    4. **No Grammar Correction**: Do NOT correct grammar errors.
+    5. **Spelling Correction**: Correct obvious spelling mistakes from ASR.
+    6. **Output Format**: Return a JSON list of strings. When joined, they should match the original text content.
     
     Text: "{text}"
     """

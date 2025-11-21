@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 # --- Spacy Model Loading ---
 
 DEFAULT_SPACY_MODEL_MAP = {
-    "en": "en_core_web_md",
-    "zh": "zh_core_web_sm",
     "de": "de_core_news_md",
 }
 
@@ -28,10 +26,10 @@ _SPACY_LOCK = threading.Lock()
 def get_spacy_model(language: str):
     config = load_config()
     model_map = config.get("app", {}).get("spacy_model_map", DEFAULT_SPACY_MODEL_MAP)
-    model = model_map.get(language.lower(), "en_core_web_md")
+    model = model_map.get(language.lower(), "de_core_news_md")
     if language not in model_map:
         logger.warning(
-            f"Spacy model does not support '{language}', using en_core_web_md model as fallback..."
+            f"Spacy model does not support '{language}', using de_core_news_md model as fallback..."
         )
     return model
 
@@ -129,53 +127,9 @@ def split_by_comma(text, nlp):
 
 def analyze_connectors(doc, token):
     lang = doc.lang_
-    if lang == "en":
-        connectors = ["that", "which", "where", "when", "because", "but", "and", "or"]
-        mark_dep = "mark"
-        det_pron_deps = ["det", "pron"]
-        verb_pos = "VERB"
-        noun_pos = ["NOUN", "PROPN"]
-    elif lang == "zh":
-        connectors = ["", "", "", "", "", "", "", ""]
-        mark_dep = "mark"
-        det_pron_deps = ["det", "pron"]
-        verb_pos = "VERB"
-        noun_pos = ["NOUN", "PROPN"]
-    elif lang == "ja":
-        connectors = ["", "", "", "", "", "", ""]
-        mark_dep = "mark"
-        det_pron_deps = ["case"]
-        verb_pos = "VERB"
-        noun_pos = ["NOUN", "PROPN"]
-    elif lang == "fr":
-        connectors = ["que", "qui", "où", "quand", "parce que", "mais", "et", "ou"]
-        mark_dep = "mark"
-        det_pron_deps = ["det", "pron"]
-        verb_pos = "VERB"
-        noun_pos = ["NOUN", "PROPN"]
-    elif lang == "ru":
-        connectors = ["что", "который", "где", "когда", "потому что", "но", "и", "или"]
-        mark_dep = "mark"
-        det_pron_deps = ["det"]
-        verb_pos = "VERB"
-        noun_pos = ["NOUN", "PROPN"]
-    elif lang == "es":
-        connectors = ["que", "cual", "donde", "cuando", "porque", "pero", "y", "o"]
-        mark_dep = "mark"
-        det_pron_deps = ["det", "pron"]
-        verb_pos = "VERB"
-        noun_pos = ["NOUN", "PROPN"]
-    elif lang == "de":
+    if lang == "de":
         connectors = ["dass", "welche", "wo", "wann", "weil", "aber", "und", "oder"]
-        mark_dep = "mark"
         det_pron_deps = ["det", "pron"]
-        verb_pos = "VERB"
-        noun_pos = ["NOUN", "PROPN"]
-    elif lang == "it":
-        connectors = ["che", "quale", "dove", "quando", "perché", "ma", "e", "o"]
-        mark_dep = "mark"
-        det_pron_deps = ["det", "pron"]
-        verb_pos = "VERB"
         noun_pos = ["NOUN", "PROPN"]
     else:
         return False, False
@@ -183,12 +137,7 @@ def analyze_connectors(doc, token):
     if token.text.lower() not in connectors:
         return False, False
 
-    if lang == "en" and token.text.lower() == "that":
-        if token.dep_ == mark_dep and token.head.pos_ == verb_pos:
-            return True, False
-        else:
-            return False, False
-    elif token.dep_ in det_pron_deps and token.head.pos_ in noun_pos:
+    if token.dep_ in det_pron_deps and token.head.pos_ in noun_pos:
         return False, False
     else:
         return True, False
@@ -292,7 +241,7 @@ def split_long_sentence(doc):
     i = n
 
     config = load_config()
-    language = config.get("app", {}).get("source_language", "en")
+    language = config.get("app", {}).get("source_language", "de")
     joiner = get_joiner(language)
 
     while i > 0:
@@ -333,7 +282,7 @@ def align_segments_with_tokens(
     # For languages like Chinese/Japanese, tokens don't need spaces
     # For others (English, German, etc.), they do
     config = load_config()
-    language = config.get("app", {}).get("source_language", "en")
+    language = config.get("app", {}).get("source_language", "de")
     joiner = get_joiner(language)
     full_text = joiner.join(clean_tokens)
 
@@ -478,7 +427,7 @@ def split_sentences(
     """
     logger.info("Starting NLP sentence splitting...")
 
-    source_lang = config.get("app", {}).get("source_language", "en")
+    source_lang = config.get("app", {}).get("source_language", "de")
     nlp = init_nlp(language=source_lang)
 
     max_len = config.get("app", {}).get("max_split_length", 80)

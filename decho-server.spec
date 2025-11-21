@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['C:\\Users\\xjwei\\VScodeProjects\\Tools\\Hearing\\server\\main.py'],
+    ['C:\\Users\\xjwei\\VScodeProjects\\Tools\\DECHO\\server\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[('config.yaml', '.')],
+    datas=[],
     hiddenimports=['uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.lifespan', 'uvicorn.lifespan.on', 'engineio.async_drivers.aiohttp'],
     hookspath=[],
     hooksconfig={},

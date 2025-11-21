@@ -3,7 +3,7 @@ import os
 import threading
 from typing import Any, Dict
 
-import yaml
+from dotenv import load_dotenv
 from rich.logging import RichHandler
 
 from backend.exceptions import ConfigError
@@ -32,72 +32,90 @@ def setup_logging() -> None:
 
 
 _config_cache = None
-_config_mtime = 0
+_config_loaded = False
 _config_lock = threading.Lock()
+
+
+def _str_to_bool(value: str) -> bool:
+    """Convert string to boolean."""
+    return value.lower() in ("true", "1", "yes", "on")
 
 
 def load_config(reload: bool = False) -> Dict[str, Any]:
     """
-    Loads and validates the configuration from config.yaml.
-    Caches the configuration and reloads if the file changes or reload is True.
+    Loads and validates the configuration from environment variables.
+    Caches the configuration for performance.
     Thread-safe using double-checked locking pattern.
 
     Returns:
         Dict[str, Any]: The configuration dictionary.
 
     Raises:
-        ConfigError: If the configuration file is missing or invalid.
+        ConfigError: If required configuration is missing or invalid.
     """
-    global _config_cache, _config_mtime
+    global _config_cache, _config_loaded
 
-    config_path = "config.yaml"
-    if not os.path.exists(config_path):
-        raise ConfigError(f"Configuration file not found: {config_path}")
+    # Fast path: check if cache is valid without lock
+    if _config_cache is not None and not reload and _config_loaded:
+        return _config_cache
 
-    try:
-        current_mtime = os.path.getmtime(config_path)
-
-        # Fast path: check if cache is valid without lock
-        if _config_cache is not None and not reload and current_mtime == _config_mtime:
+    # Need to load config - acquire lock
+    with _config_lock:
+        # Double-check inside lock
+        if _config_cache is not None and not reload and _config_loaded:
             return _config_cache
 
-        # Need to load config - acquire lock
-        with _config_lock:
-            # Double-check inside lock
-            if (
-                _config_cache is not None
-                and not reload
-                and current_mtime == _config_mtime
-            ):
-                return _config_cache
+        # Load .env file if it exists
+        load_dotenv(override=reload)
 
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-                _config_cache = config
-                _config_mtime = current_mtime
+        # Build configuration from environment variables
+        config = {
+            "llm": {
+                "api_key": os.getenv("LLM_API_KEY", ""),
+                "base_url": os.getenv("LLM_BASE_URL", "https://example-llm-provider.com/v1"),
+                "model": os.getenv("LLM_MODEL", "gemini-2.5-flash"),
+            },
+            "tts": {
+                "api_key": os.getenv("TTS_API_KEY", ""),
+                "model": os.getenv("TTS_MODEL", "gemini-2.5-flash-preview-tts"),
+                "voice_map": {
+                    "male": os.getenv("TTS_VOICE_MALE", "Orus"),
+                    "female": os.getenv("TTS_VOICE_FEMALE", "Kore"),
+                },
+                "defaults": {
+                    "speed": os.getenv("TTS_SPEED", "Native conversational pace"),
+                    "tone": os.getenv("TTS_TONE", "Clear, educational, engaging"),
+                    "language": os.getenv("TTS_LANGUAGE", "de-DE"),
+                },
+            },
+            "asr": {
+                "method": os.getenv("ASR_METHOD", "parakeet"),
+                "parakeet_model_dir": os.getenv(
+                    "ASR_PARAKEET_MODEL_DIR",
+                    "models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+                ),
+                "enable_demucs": _str_to_bool(os.getenv("ASR_ENABLE_DEMUCS", "false")),
+                "enable_vad": _str_to_bool(os.getenv("ASR_ENABLE_VAD", "false")),
+            },
+            "app": {
+                "max_split_length": int(os.getenv("APP_MAX_SPLIT_LENGTH", "80")),
+                "use_llm": _str_to_bool(os.getenv("APP_USE_LLM", "true")),
+                "source_language": os.getenv("APP_SOURCE_LANGUAGE", "de"),
+                "target_language": os.getenv("APP_TARGET_LANGUAGE", "de"),
+                "spacy_model_map": {
+                    "de": os.getenv("APP_SPACY_MODEL_DE", "de_core_news_md"),
+                },
+            },
+        }
 
-            # Basic validation
-            if "asr" not in config or "app" not in config:
-                raise ConfigError("Invalid config: missing 'asr' or 'app' sections")
+        # Basic validation
+        if not config["asr"] or not config["app"]:
+            raise ConfigError("Invalid config: missing 'asr' or 'app' sections")
 
-            return config
-    except yaml.YAMLError as e:
-        raise ConfigError(f"Error parsing config file: {e}")
+        _config_cache = config
+        _config_loaded = True
 
-
-def save_config(config: Dict[str, Any]) -> None:
-    """
-    Saves the configuration to config.yaml.
-
-    Args:
-        config (Dict[str, Any]): The configuration dictionary to save.
-    """
-    config_path = "config.yaml"
-    try:
-        with open(config_path, "w", encoding="utf-8") as f:
-            yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
-    except Exception as e:
-        raise ConfigError(f"Error saving config file: {e}")
+        return config
 
 
 def get_joiner(language: str) -> str:
@@ -105,7 +123,7 @@ def get_joiner(language: str) -> str:
     Returns the joiner character for the given language.
 
     Args:
-        language (str): The language code (e.g., "en", "zh", "de").
+        language (str): The language code (e.g., "de").
 
     Returns:
         str: The joiner character (" " or "").
