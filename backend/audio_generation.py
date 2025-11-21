@@ -80,19 +80,35 @@ def process_uploaded_file(file_path: str) -> str:
             content = f.read()
 
         if path.suffix.lower() == ".md":
-            # Basic Markdown cleanup
+            # Enhanced Markdown cleanup
+            # Remove code blocks (```...```)
+            content = re.sub(r"```[\s\S]*?```", "", content)
+            # Remove inline code (`...`)
+            content = re.sub(r"`[^`]+`", "", content)
             # Remove images ![alt](url)
             content = re.sub(r"!\[.*?\]\(.*?\)", "", content)
             # Replace links [text](url) with text
             content = re.sub(r"\[([^\]]+)\]\(.*?\)", r"\1", content)
-            # Remove header markers #
-            content = re.sub(r"^#+\s+", "", content, flags=re.MULTILINE)
-            # Remove bold/italic markers
-            content = re.sub(r"\*\*|__", "", content)
-            # Be careful with * and _ as they can be used for lists or other things.
-            # Only remove if they are likely formatting.
-            # For simplicity, let's just remove ** and __ for now, and maybe single * if it wraps text?
-            # Let's stick to simple removal of ** and __
+            # Remove header markers # (but keep the text)
+            content = re.sub(r"^#{1,6}\s+", "", content, flags=re.MULTILINE)
+            # Remove bold/italic markers (**text**, __text__, *text*, _text_)
+            content = re.sub(r"\*\*([^\*]+)\*\*", r"\1", content)  # **bold**
+            content = re.sub(r"__([^_]+)__", r"\1", content)  # __bold__
+            content = re.sub(r"\*([^\*]+)\*", r"\1", content)  # *italic*
+            content = re.sub(r"_([^_]+)_", r"\1", content)  # _italic_
+            # Remove list markers (-, *, +, numbers)
+            content = re.sub(
+                r"^\s*[-\*\+]\s+", "", content, flags=re.MULTILINE
+            )  # unordered lists
+            content = re.sub(
+                r"^\s*\d+\.\s+", "", content, flags=re.MULTILINE
+            )  # ordered lists
+            # Remove blockquote markers
+            content = re.sub(r"^\s*>\s+", "", content, flags=re.MULTILINE)
+            # Remove horizontal rules (---, ***, ___)
+            content = re.sub(r"^[\-\*_]{3,}\s*$", "", content, flags=re.MULTILINE)
+            # Clean up multiple newlines
+            content = re.sub(r"\n{3,}", "\n\n", content)
 
         return content.strip()
 

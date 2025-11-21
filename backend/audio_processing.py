@@ -68,7 +68,11 @@ def apply_demucs(input_path: str) -> str:
             return input_path
 
     except subprocess.CalledProcessError as exc:
-        error_msg = exc.stderr.decode().strip() if exc.stderr else str(exc)
+        error_msg = (
+            exc.stderr.decode("utf-8", errors="replace").strip()
+            if exc.stderr
+            else str(exc)
+        )
         logger.error(f"Demucs failed: {error_msg}")
         return input_path
 
@@ -147,6 +151,10 @@ def convert_to_wav(input_path: str) -> str:
         logger.info(f"Audio converted successfully: {output_path}")
         return output_path
     except subprocess.CalledProcessError as exc:
-        error_msg = exc.stderr.decode().strip() if exc.stderr else str(exc)
+        error_msg = (
+            exc.stderr.decode("utf-8", errors="replace").strip()
+            if exc.stderr
+            else str(exc)
+        )
         logger.error(f"ffmpeg conversion failed: {error_msg}")
         raise AudioConversionError(f"ffmpeg conversion failed: {error_msg}") from exc

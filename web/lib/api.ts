@@ -1,7 +1,18 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window === 'undefined' ? 'http://127.0.0.1:8000/api' : '/api');
-const API_URL = `${API_BASE_URL}/audio`;
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem("api_base_url");
+    if (stored) return stored;
+    // Fallback to window variable if set directly
+    if ((window as any).__TAURI_PY_PORT__) {
+        return `http://127.0.0.1:${(window as any).__TAURI_PY_PORT__}/api`;
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
+};
+
+const getApiUrl = () => `${getBaseUrl()}/audio`;
 
 export interface Task {
   task_id: string;
@@ -30,7 +41,7 @@ export const api = {
   upload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await axios.post<Task>(`${API_URL}/upload`, formData, {
+    const response = await axios.post<Task>(`${getApiUrl()}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -39,48 +50,48 @@ export const api = {
   },
 
   process: async (taskId: string) => {
-    const response = await axios.post<Task>(`${API_URL}/process/${taskId}`);
+    const response = await axios.post<Task>(`${getApiUrl()}/process/${taskId}`);
     return response.data;
   },
 
   getStatus: async (taskId: string) => {
-    const response = await axios.get<Task>(`${API_URL}/status/${taskId}`);
+    const response = await axios.get<Task>(`${getApiUrl()}/status/${taskId}`);
     return response.data;
   },
 
   getResult: async (taskId: string) => {
-    const response = await axios.get<{ task_id: string; segments: Segment[] }>(`${API_URL}/result/${taskId}`);
+    const response = await axios.get<{ task_id: string; segments: Segment[] }>(`${getApiUrl()}/result/${taskId}`);
     return response.data;
   },
 
   listTasks: async () => {
     try {
-      const response = await axios.get<Task[]>(`${API_URL}/tasks`);
+      const response = await axios.get<Task[]>(`${getApiUrl()}/tasks`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch tasks from ${API_URL}/tasks`, error);
+      console.error(`Failed to fetch tasks from ${getApiUrl()}/tasks`, error);
       throw error;
     }
   },
 
   deleteTask: async (taskId: string) => {
-    const response = await axios.delete(`${API_URL}/task/${taskId}`);
+    const response = await axios.delete(`${getApiUrl()}/task/${taskId}`);
     return response.data;
   },
 
   getConfig: async () => {
-    const response = await axios.get<Config>(`${API_BASE_URL}/config/`);
+    const response = await axios.get<Config>(`${getBaseUrl()}/config/`);
     return response.data;
   },
 
   updateConfig: async (config: Config) => {
-    const response = await axios.patch<Config>(`${API_URL.replace('/audio', '/config')}`, config);
+    const response = await axios.patch<Config>(`${getApiUrl().replace('/audio', '/config')}`, config);
     return response.data;
   },
 
   testConfig: async (config: Config) => {
     const response = await axios.post<{ status: string; message: string }>(
-      `${API_URL.replace('/audio', '/config')}/test-llm`,
+      `${getApiUrl().replace('/audio', '/config')}/test-llm`,
       config
     );
     return response.data;
@@ -88,7 +99,7 @@ export const api = {
 
   testTTSConfig: async (config: Config) => {
     const response = await axios.post<{ status: string; message: string }>(
-      `${API_URL.replace('/audio', '/config')}/test-tts`,
+      `${getApiUrl().replace('/audio', '/config')}/test-tts`,
       config
     );
     return response.data;
@@ -98,7 +109,7 @@ export const api = {
     const formData = new FormData();
     formData.append('file', file, 'recording.webm');
     const response = await axios.post<{ message: string; filePath: string }>(
-      `${API_URL}/practice/${taskId}/${segmentIndex}`,
+      `${getApiUrl()}/practice/${taskId}/${segmentIndex}`,
       formData
     );
     return response.data;
@@ -107,13 +118,13 @@ export const api = {
   getPracticeRecordings: async (taskId: string) => {
     const response = await axios.get<
       { id: string; segmentIndex: number; filePath: string; createdAt: string }[]
-    >(`${API_URL}/practice/${taskId}`);
+    >(`${getApiUrl()}/practice/${taskId}`);
     return response.data;
   },
 
   updateTaskProgress: async (taskId: string, lastPlayedChunkIndex: number) => {
     const response = await axios.post<{ message: string }>(
-      `${API_URL}/tasks/${taskId}/progress`,
+      `${getApiUrl()}/tasks/${taskId}/progress`,
       null,
       {
         params: { last_played_chunk_index: lastPlayedChunkIndex },
@@ -122,10 +133,10 @@ export const api = {
     return response.data;
   },
 
-  downloadSrtUrl: (taskId: string) => `${API_URL}/download/${taskId}/srt`,
+  downloadSrtUrl: (taskId: string) => `${getApiUrl()}/download/${taskId}/srt`,
 
   getTasks: async () => {
-    const response = await axios.get<Task[]>(`${API_URL}/tasks`);
+    const response = await axios.get<Task[]>(`${getApiUrl()}/tasks`);
     return response.data;
   },
 };

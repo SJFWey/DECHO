@@ -1,4 +1,5 @@
 import logging
+import threading
 from typing import Any, Dict, List, Optional
 
 from backend.llm import split_text_by_meaning
@@ -10,6 +11,8 @@ import warnings
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+logger = logging.getLogger(__name__)
+
 # --- Spacy Model Loading ---
 
 DEFAULT_SPACY_MODEL_MAP = {
@@ -19,6 +22,7 @@ DEFAULT_SPACY_MODEL_MAP = {
 }
 
 _SPACY_CACHE: Dict[str, Any] = {}
+_SPACY_LOCK = threading.Lock()
 
 
 def get_spacy_model(language: str):
@@ -33,6 +37,10 @@ def get_spacy_model(language: str):
 
 
 def init_nlp(language: Optional[str] = None):
+    """
+    Initializes and caches a spacy NLP model for the given language.
+    Thread-safe using double-checked locking pattern.
+    """
     global _SPACY_CACHE
     try:
         config = load_config()
@@ -42,24 +50,33 @@ def init_nlp(language: Optional[str] = None):
         if language is None:
             language = "de"
 
+        # First check without lock (fast path)
         if language in _SPACY_CACHE:
             return _SPACY_CACHE[language]
 
-        model = get_spacy_model(language)
-        logger.info(f"Loading NLP Spacy model for language '{language}': <{model}> ...")
+        # Need to load model - acquire lock
+        with _SPACY_LOCK:
+            # Double-check inside lock
+            if language in _SPACY_CACHE:
+                return _SPACY_CACHE[language]
 
-        try:
-            nlp = spacy.load(model)
-        except OSError:
-            logger.warning(f"Downloading {model} model...")
-            logger.warning(
-                "If download failed, please check your network and try again."
+            model = get_spacy_model(language)
+            logger.info(
+                f"Loading NLP Spacy model for language '{language}': <{model}> ..."
             )
-            download(model)
-            nlp = spacy.load(model)
 
-        _SPACY_CACHE[language] = nlp
-        return nlp
+            try:
+                nlp = spacy.load(model)
+            except OSError:
+                logger.warning(f"Downloading {model} model...")
+                logger.warning(
+                    "If download failed, please check your network and try again."
+                )
+                download(model)
+                nlp = spacy.load(model)
+
+            _SPACY_CACHE[language] = nlp
+            return nlp
     except Exception as e:
         logger.error(f"Failed to load NLP model: {e}")
         raise
@@ -187,7 +204,12 @@ def split_by_connectors(text, context_words=5, nlp: Optional[Any] = None):
     doc = nlp(text)
     sentences = [doc.text]
 
-    while True:
+    # Safety measure: limit iterations to prevent infinite loops
+    max_iterations = 100
+    iteration = 0
+
+    while iteration < max_iterations:
+        iteration += 1
         split_occurred = False
         new_sentences = []
 
@@ -232,6 +254,12 @@ def split_by_connectors(text, context_words=5, nlp: Optional[Any] = None):
             break
 
         sentences = new_sentences
+
+    if iteration >= max_iterations:
+        logger.warning(
+            f"split_by_connectors reached max iterations ({max_iterations}). "
+            "Returning current state to avoid infinite loop."
+        )
 
     return sentences
 
@@ -300,7 +328,14 @@ def align_segments_with_tokens(
         return []
 
     clean_tokens = [str(t) for t in tokens]
-    full_text = "".join(clean_tokens)
+
+    # Use language-aware joiner for token concatenation
+    # For languages like Chinese/Japanese, tokens don't need spaces
+    # For others (English, German, etc.), they do
+    config = load_config()
+    language = config.get("app", {}).get("source_language", "en")
+    joiner = get_joiner(language)
+    full_text = joiner.join(clean_tokens)
 
     if not full_text:
         logger.warning("Tokenizer returned empty text. Falling back to linear.")
@@ -390,8 +425,20 @@ def align_segments_with_tokens(
 
         match_end = match_start + len(part_norm)
 
-        # Map back to original indices
+        # Map back to original indices with bounds checking
         # match_end is exclusive in slice, so the last char index is match_end - 1
+        if match_end > len(norm_to_orig_map):
+            match_end = len(norm_to_orig_map)
+
+        if match_end == 0:
+            # Edge case: empty match
+            part_start_time = aligned_segments[-1]["end"] if aligned_segments else 0.0
+            part_end_time = part_start_time + 0.1
+            aligned_segments.append(
+                {"text": part, "start": part_start_time, "end": part_end_time}
+            )
+            continue
+
         orig_start_index = norm_to_orig_map[match_start]
         orig_end_index = norm_to_orig_map[match_end - 1]
 

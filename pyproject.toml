@@ -1,5 +1,5 @@
 [project]
-name = "hearing"
+name = "decho"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -25,6 +25,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "spacy>=3.7.0",
     "google-genai>=1.51.0",
+    "pyinstaller>=6.11.1",
 ]
 
 [tool.uv]

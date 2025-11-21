@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "Starting Hearing App..." -ForegroundColor Green
+Write-Host "Starting DECHO App..." -ForegroundColor Green
 
 $currentDir = Get-Location
 

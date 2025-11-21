@@ -27,4 +27,4 @@ models/
 *.sqlite3
 .ipynb_checkpoints/
 config.yaml
-docs/
+/docs

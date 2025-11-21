@@ -324,7 +324,7 @@ export default function HomePage() {
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8 rounded-full text-zinc-400 hover:bg-white/10 hover:text-blue-400 transition-colors"
-                                            onClick={() => router.push(`/practice/${task.task_id}`)}
+                                            onClick={() => router.push(`/practice?id=${task.task_id}`)}
                                         >
                                             <Play className="h-4 w-4" />
                                         </Button>

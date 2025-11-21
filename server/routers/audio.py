@@ -9,7 +9,6 @@ from typing import Dict
 import soundfile as sf
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Depends
 from fastapi.responses import FileResponse
-from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from server.schemas import TaskResponse, TaskStatus, SubtitleResponse
@@ -28,14 +27,21 @@ logger = logging.getLogger(__name__)
 # Configure logging to file
 LOG_DIR = "output/log"
 os.makedirs(LOG_DIR, exist_ok=True)
-file_handler = logging.FileHandler(
-    os.path.join(LOG_DIR, "audio_processing.log"), encoding="utf-8"
-)
-file_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-)
-logger.addHandler(file_handler)
-logger.setLevel(logging.INFO)
+
+# Only add file handler if it doesn't already exist
+if not any(
+    isinstance(h, logging.FileHandler)
+    and h.baseFilename == os.path.abspath(os.path.join(LOG_DIR, "audio_processing.log"))
+    for h in logger.handlers
+):
+    file_handler = logging.FileHandler(
+        os.path.join(LOG_DIR, "audio_processing.log"), encoding="utf-8"
+    )
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
+    logger.addHandler(file_handler)
+    logger.setLevel(logging.INFO)
 
 UPLOAD_DIR = "output/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -192,6 +198,7 @@ def process_audio_task(task_id: str):
     except Exception as e:
         logger.error(f"Task {task_id} failed: {e}", exc_info=True)
         if task:
+            db.rollback()  # Rollback any partial changes
             task.status = TaskStatus.FAILED
             task.message = str(e)
             db.commit()
@@ -265,6 +272,7 @@ def convert_text_and_process(task_id: str, temp_text_path: str, original_filenam
     except Exception as e:
         logger.error(f"Background text conversion failed: {e}")
         if task:
+            db.rollback()  # Rollback any partial changes
             task.status = TaskStatus.FAILED
             task.message = f"System error: {str(e)}"
             db.commit()

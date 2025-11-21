@@ -1,6 +1,6 @@
 import logging
 import os
-import sys
+import threading
 from typing import Any, Dict
 
 import yaml
@@ -33,12 +33,14 @@ def setup_logging() -> None:
 
 _config_cache = None
 _config_mtime = 0
+_config_lock = threading.Lock()
 
 
 def load_config(reload: bool = False) -> Dict[str, Any]:
     """
     Loads and validates the configuration from config.yaml.
     Caches the configuration and reloads if the file changes or reload is True.
+    Thread-safe using double-checked locking pattern.
 
     Returns:
         Dict[str, Any]: The configuration dictionary.
@@ -54,19 +56,31 @@ def load_config(reload: bool = False) -> Dict[str, Any]:
 
     try:
         current_mtime = os.path.getmtime(config_path)
+
+        # Fast path: check if cache is valid without lock
         if _config_cache is not None and not reload and current_mtime == _config_mtime:
             return _config_cache
 
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-            _config_cache = config
-            _config_mtime = current_mtime
+        # Need to load config - acquire lock
+        with _config_lock:
+            # Double-check inside lock
+            if (
+                _config_cache is not None
+                and not reload
+                and current_mtime == _config_mtime
+            ):
+                return _config_cache
 
-        # Basic validation
-        if "asr" not in config or "app" not in config:
-            raise ConfigError("Invalid config: missing 'asr' or 'app' sections")
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+                _config_cache = config
+                _config_mtime = current_mtime
 
-        return config
+            # Basic validation
+            if "asr" not in config or "app" not in config:
+                raise ConfigError("Invalid config: missing 'asr' or 'app' sections")
+
+            return config
     except yaml.YAMLError as e:
         raise ConfigError(f"Error parsing config file: {e}")
 

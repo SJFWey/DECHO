@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import subprocess
+import threading
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
@@ -323,16 +324,21 @@ class ParakeetASR:
 
 
 _ASR_INSTANCE: Optional[ParakeetASR] = None
+_ASR_LOCK = threading.Lock()
 
 
 def get_asr_instance() -> ParakeetASR:
     """
     Returns a singleton instance of ParakeetASR.
     Initializes it if it doesn't exist.
+    Thread-safe using double-checked locking pattern.
     """
     global _ASR_INSTANCE
     if _ASR_INSTANCE is None:
-        _ASR_INSTANCE = ParakeetASR()
+        with _ASR_LOCK:
+            # Double-check inside lock to prevent race condition
+            if _ASR_INSTANCE is None:
+                _ASR_INSTANCE = ParakeetASR()
     return _ASR_INSTANCE
 
 

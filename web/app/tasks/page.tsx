@@ -72,7 +72,7 @@ export default function TasksPage() {
             </CardHeader>
             <CardContent>
               <div className="flex justify-end space-x-2">
-                <Link href={`/tasks/${task.task_id}`}>
+                <Link href={`/task-details?id=${task.task_id}`}>
                   <Button variant="outline" size="sm">
                     <FileText className="mr-2 h-4 w-4" />
                     View

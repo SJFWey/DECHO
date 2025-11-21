@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
-import { useParams, useSearchParams } from "next/navigation"
+import { useEffect, useState, useRef, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { api, Task, Segment } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -12,10 +12,9 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 
-export default function TaskPage() {
-  const params = useParams()
+function TaskDetailsContent() {
   const searchParams = useSearchParams()
-  const id = params.id as string
+  const id = searchParams.get("id")
   const [task, setTask] = useState<Task | null>(null)
   const [segments, setSegments] = useState<Segment[]>([])
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState<number | null>(null)
@@ -31,6 +30,8 @@ export default function TaskPage() {
   const userAudioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
+    if (!id) return
+
     let interval: NodeJS.Timeout
 
     const fetchStatus = async () => {
@@ -56,7 +57,7 @@ export default function TaskPage() {
   }, [id])
 
   useEffect(() => {
-    if (task?.status === 'completed') {
+    if (task?.status === 'completed' && id) {
       const fetchRecordings = async () => {
         try {
           const recs = await api.getPracticeRecordings(id)
@@ -107,6 +108,7 @@ export default function TaskPage() {
   }
 
   const startRecording = async () => {
+    if (!id) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
@@ -157,6 +159,7 @@ export default function TaskPage() {
     return `${baseUrl}/user_recordings/${filename}`
   }
 
+  if (!id) return <div className="p-8">Missing Task ID</div>
   if (!task) return <div className="p-8">Loading...</div>
 
   return (
@@ -297,7 +300,7 @@ export default function TaskPage() {
                             }
                           }}
                           title="Play My Recording"
-                        >
+                          >
                           <Play className="h-4 w-4" />
                         </Button>
                       )}
@@ -329,4 +332,12 @@ function formatTime(seconds: number): string {
   const secs = Math.floor(seconds % 60)
   const ms = Math.floor((seconds % 1) * 1000)
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`
+}
+
+export default function TaskPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TaskDetailsContent />
+    </Suspense>
+  )
 }

@@ -113,7 +113,18 @@ def split_text_by_meaning(text: str, max_length: int = 80) -> List[str]:
 
     response = chat_completion(messages)
     if response:
-        content = response["choices"][0]["message"]["content"]
+        # Safely access response structure with validation
+        if "choices" in response and len(response["choices"]) > 0:
+            choice = response["choices"][0]
+            if "message" in choice and "content" in choice["message"]:
+                content = choice["message"]["content"]
+            else:
+                logger.warning("LLM response missing 'message' or 'content' field")
+                return [text]
+        else:
+            logger.warning("LLM response missing 'choices' field or empty")
+            return [text]
+
         # Try to parse JSON from the response
         try:
             # Clean up code blocks if present
