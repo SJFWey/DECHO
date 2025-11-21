@@ -22,6 +22,8 @@ export default function HomePage() {
   const [uploading, setUploading] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [mode, setMode] = useState<'audio' | 'text'>('audio');
+  const [placeholder, setPlaceholder] = useState("Upload an audio file");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -30,6 +32,36 @@ export default function HomePage() {
     const interval = setInterval(fetchTasks, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const targetText = mode === 'audio' ? "Upload an audio file" : "Upload a text file";
+    let startTime: number | null = null;
+    let animationFrameId: number;
+    const duration = 400; // Faster duration for smoother feel
+
+    const animate = (timestamp: number) => {
+        if (!startTime) startTime = timestamp;
+        const progress = timestamp - startTime;
+        
+        const charCount = Math.min(
+            Math.floor((progress / duration) * targetText.length),
+            targetText.length
+        );
+        
+        setPlaceholder(targetText.slice(0, charCount));
+
+        if (progress < duration) {
+            animationFrameId = requestAnimationFrame(animate);
+        } else {
+            setPlaceholder(targetText);
+        }
+    };
+
+    setPlaceholder("");
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [mode]);
 
   const fetchTasks = async () => {
     try {
@@ -67,12 +99,14 @@ export default function HomePage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       
       fetchTasks();
-      try {
-        await api.process(task.task_id);
-        toast.info("Processing started");
-        fetchTasks();
-      } catch (e) {
-        console.error("Auto-process failed", e);
+      if (task.status === 'pending') {
+        try {
+          await api.process(task.task_id);
+          toast.info("Processing started");
+          fetchTasks();
+        } catch (e) {
+          console.error("Auto-process failed", e);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -95,9 +129,11 @@ export default function HomePage() {
     const normalized = hasTimezone ? dateString : `${dateString}Z`;
     const date = new Date(normalized);
     if (isNaN(date.getTime())) return "-";
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleString(undefined, {
       month: "short",
       day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -173,54 +209,71 @@ export default function HomePage() {
       </div>
 
       {/* Upload Input (Google Search Style) */}
-      <div className="w-full max-w-2xl relative group">
-        <div 
-            className={cn(
-                "relative flex items-center w-full h-14 rounded-full bg-secondary/30 border border-white/10 backdrop-blur-md transition-all duration-300",
-                "hover:bg-secondary/40 hover:shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:border-white/20",
-                "focus-within:bg-secondary/50 focus-within:shadow-[0_0_25px_rgba(255,255,255,0.1)] focus-within:border-white/30"
-            )}
-        >
-            <input 
-                type="file" 
-                ref={fileInputRef}
-                className="hidden" 
-                accept="audio/*"
-                onChange={handleFileChange}
-            />
-            
-            <input 
-                type="text"
-                readOnly
-                placeholder="Upload an audio file"
-                value={file ? file.name : ""}
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-full bg-transparent border-none outline-none px-8 text-lg placeholder:text-muted-foreground/50 cursor-pointer text-foreground"
-            />
+      <div className="w-full max-w-2xl flex gap-4 items-center">
+        {/* Toggle Button */}
+        <div className="relative group/toggle-btn h-14 w-14 flex-shrink-0">
+            <div className="relative h-full w-full rounded-full overflow-hidden p-[1px]">
+                 <div className="absolute inset-0 bg-zinc-800 transition-opacity duration-300 group-hover/toggle-btn:opacity-0" />
+                 <div className="absolute inset-[-100%] bg-[conic-gradient(from_90deg_at_50%_50%,#71717a_0%,#e4e4e7_50%,#71717a_100%)] animate-[spin_2s_linear_infinite] opacity-0 transition-opacity duration-300 group-hover/toggle-btn:opacity-100" />
+                 
+                 <button
+                    onClick={() => setMode(mode === 'audio' ? 'text' : 'audio')}
+                    className="relative h-full w-full rounded-full bg-background/90 hover:bg-background/70 text-white text-xs font-medium transition-all flex items-center justify-center"
+                 >
+                    {mode === 'audio' ? 'Audio' : 'Text'}
+                 </button>
+            </div>
+        </div>
 
-            {/* Upload Button */}
-            <div className="absolute right-2 top-2 bottom-2 group/upload-btn">
-                <div className="relative h-full rounded-full overflow-hidden p-[1px]">
-                    {/* Default Border */}
-                    <div className="absolute inset-0 bg-zinc-800 transition-opacity duration-300 group-hover/upload-btn:opacity-0" />
-                    
-                    {/* Rotating Gradient Border */}
-                    <div className="absolute inset-[-100%] bg-[conic-gradient(from_90deg_at_50%_50%,#71717a_0%,#e4e4e7_50%,#71717a_100%)] animate-[spin_2s_linear_infinite] opacity-0 transition-opacity duration-300 group-hover/upload-btn:opacity-100" />
-                    
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpload();
-                        }}
-                        disabled={uploading}
-                        className="relative h-full px-6 rounded-full bg-background/90 hover:bg-background/70 text-white text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {uploading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            "Upload"
-                        )}
-                    </button>
+        <div className="flex-grow relative group">
+            <div 
+                className={cn(
+                    "relative flex items-center w-full h-14 rounded-full bg-secondary/30 border border-white/10 backdrop-blur-md transition-all duration-300",
+                    "hover:bg-secondary/40 hover:shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:border-white/20",
+                    "focus-within:bg-secondary/50 focus-within:shadow-[0_0_25px_rgba(255,255,255,0.1)] focus-within:border-white/30"
+                )}
+            >
+                <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    className="hidden" 
+                    accept={mode === 'audio' ? "audio/*" : ".txt,.md,text/plain,text/markdown"}
+                    onChange={handleFileChange}
+                />
+                
+                <input 
+                    type="text"
+                    readOnly
+                    placeholder={placeholder}
+                    value={file ? file.name : ""}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full h-full bg-transparent border-none outline-none px-8 text-lg placeholder:text-muted-foreground/50 cursor-pointer text-foreground"
+                />
+
+                {/* Upload Button */}
+                <div className="absolute right-2 top-2 bottom-2 group/upload-btn">
+                    <div className="relative h-full rounded-full overflow-hidden p-[1px]">
+                        {/* Default Border */}
+                        <div className="absolute inset-0 bg-zinc-800 transition-opacity duration-300 group-hover/upload-btn:opacity-0" />
+                        
+                        {/* Rotating Gradient Border */}
+                        <div className="absolute inset-[-100%] bg-[conic-gradient(from_90deg_at_50%_50%,#71717a_0%,#e4e4e7_50%,#71717a_100%)] animate-[spin_2s_linear_infinite] opacity-0 transition-opacity duration-300 group-hover/upload-btn:opacity-100" />
+                        
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpload();
+                            }}
+                            disabled={uploading}
+                            className="relative h-full px-6 rounded-full bg-background/90 hover:bg-background/70 text-white text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {uploading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                "Upload"
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -315,16 +368,16 @@ export default function HomePage() {
 
 function StatusBadge({ status }: { status: string }) {
     const styles = {
-        completed: "bg-green-500/10 text-green-400 border-green-500/20",
-        processing: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-        pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-        failed: "bg-red-500/10 text-red-400 border-red-500/20",
+        completed: "text-green-600",
+        processing: "text-yellow-600",
+        pending: "text-yellow-600",
+        failed: "text-red-600",
     };
     
-    const style = styles[status as keyof typeof styles] || "bg-gray-500/10 text-gray-400 border-gray-500/20";
+    const style = styles[status as keyof typeof styles] || "text-gray-500";
 
     return (
-        <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium border", style)}>
+        <span className={cn("text-sm font-medium", style)}>
             {status}
         </span>
     );

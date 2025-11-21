@@ -9,6 +9,7 @@ from typing import Dict
 import soundfile as sf
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Depends
 from fastapi.responses import FileResponse
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from server.schemas import TaskResponse, TaskStatus, SubtitleResponse
@@ -19,6 +20,7 @@ from backend.asr import transcribe_audio
 from backend.nlp import split_sentences
 from backend.subtitle import generate_srt
 from backend.utils import load_config
+from backend.audio_generation import process_uploaded_file, generate_audio
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -220,35 +222,127 @@ def process_audio_task(task_id: str):
         db.close()
 
 
+def convert_text_and_process(task_id: str, temp_text_path: str, original_filename: str):
+    db = SessionLocal()
+    task = None
+    try:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        if not task:
+            logger.error(f"Task {task_id} not found in text conversion task")
+            return
+
+        task.message = "Generating audio..."
+        db.commit()
+
+        # Generate Audio
+        try:
+            text_content = process_uploaded_file(temp_text_path)
+            generated_audio_path = generate_audio(text_content)
+            if not generated_audio_path:
+                raise Exception("TTS generation returned None")
+        except Exception as e:
+            logger.error(f"Text to Audio failed: {e}")
+            task.status = TaskStatus.FAILED
+            task.message = f"Text to Audio failed: {str(e)}"
+            db.commit()
+            return
+        finally:
+            if os.path.exists(temp_text_path):
+                os.remove(temp_text_path)
+
+        # Move and rename
+        new_filename = os.path.splitext(original_filename)[0] + ".wav"
+        file_path = os.path.join(UPLOAD_DIR, f"{task_id}_{new_filename}")
+        shutil.move(generated_audio_path, file_path)
+
+        task.filename = new_filename
+        task.filePath = file_path
+        db.commit()
+
+        # Now trigger the regular audio processing
+        process_audio_task(task_id)
+
+    except Exception as e:
+        logger.error(f"Background text conversion failed: {e}")
+        if task:
+            task.status = TaskStatus.FAILED
+            task.message = f"System error: {str(e)}"
+            db.commit()
+    finally:
+        db.close()
+
+
 @router.post("/upload", response_model=TaskResponse)
-async def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_audio(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     task_id = str(uuid.uuid4())
-    file_path = os.path.join(UPLOAD_DIR, f"{task_id}_{file.filename}")
+    filename = file.filename or "unknown"
+    ext = os.path.splitext(filename)[1].lower()
 
-    with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    if ext in [".txt", ".md"]:
+        # Save text file temporarily
+        temp_text_path = os.path.join(UPLOAD_DIR, f"{task_id}_{filename}")
+        with open(temp_text_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
 
-    new_task = Task(
-        id=task_id,
-        status=TaskStatus.PENDING,
-        filename=file.filename,
-        filePath=file_path,
-        progress=0.0,
-    )
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
+        # Create task immediately
+        new_task = Task(
+            id=task_id,
+            status=TaskStatus.PROCESSING,
+            filename=filename,
+            filePath=temp_text_path,
+            progress=0.0,
+            message="Queued for audio generation...",
+        )
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
 
-    return TaskResponse(
-        task_id=new_task.id,
-        status=TaskStatus(new_task.status),
-        message="File uploaded successfully",
-        progress=new_task.progress,
-        file_path=new_task.filePath,
-        filename=new_task.filename,
-        duration=new_task.duration,
-        created_at=new_task.createdAt,
-    )
+        # Offload to background
+        background_tasks.add_task(
+            convert_text_and_process, task_id, temp_text_path, filename
+        )
+
+        return TaskResponse(
+            task_id=new_task.id,
+            status=TaskStatus(new_task.status),
+            message=new_task.message,
+            progress=new_task.progress,
+            file_path=new_task.filePath,
+            filename=new_task.filename,
+            duration=new_task.duration,
+            created_at=new_task.createdAt,
+        )
+
+    else:
+        file_path = os.path.join(UPLOAD_DIR, f"{task_id}_{filename}")
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        new_task = Task(
+            id=task_id,
+            status=TaskStatus.PENDING,
+            filename=filename,
+            filePath=file_path,
+            progress=0.0,
+        )
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+
+        return TaskResponse(
+            task_id=new_task.id,
+            status=TaskStatus(new_task.status),
+            message="File uploaded successfully",
+            progress=new_task.progress,
+            file_path=new_task.filePath,
+            filename=new_task.filename,
+            duration=new_task.duration,
+            created_at=new_task.createdAt,
+        )
 
 
 @router.post("/process/{task_id}", response_model=TaskResponse)

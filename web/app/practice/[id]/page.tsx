@@ -99,7 +99,8 @@ export default function PracticePage() {
     } else {
       const segment = segments[currentIndex];
       // Only reset time if we're outside the current segment
-      if (audioRef.current.currentTime < segment.start || audioRef.current.currentTime >= segment.end) {
+      const padding = 0.1;
+      if (audioRef.current.currentTime < segment.start || audioRef.current.currentTime >= segment.end + padding) {
         audioRef.current.currentTime = segment.start;
       }
       audioRef.current.play();
@@ -110,7 +111,9 @@ export default function PracticePage() {
   const handleTimeUpdate = () => {
     if (!audioRef.current || segments.length === 0) return;
     const segment = segments[currentIndex];
-    if (audioRef.current.currentTime >= segment.end) {
+    // Add 200ms padding to avoid abrupt cut-off
+    const padding = 0.2;
+    if (audioRef.current.currentTime >= segment.end + padding) {
       audioRef.current.pause();
       setIsPlaying(false);
       audioRef.current.currentTime = segment.start;

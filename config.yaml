@@ -15,3 +15,13 @@ llm:
   api_key: REDACTED_LLM_KEY
   base_url: https://example-llm-provider.com/v1
   model: gemini-2.5-flash
+tts:
+  api_key: "REDACTED_TTS_KEY"
+  model: gemini-2.5-flash-preview-tts
+  defaults:
+    language: de-DE
+    speed: "Native conversational pace"
+    tone: "Clear, educational, engaging"
+  voice_map:
+    male: Orus
+    female: Kore

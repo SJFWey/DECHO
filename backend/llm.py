@@ -1,9 +1,13 @@
+import io
 import json
 import logging
 import os
+import wave
 from typing import Any, Dict, List, Optional
 
 import requests
+from google import genai
+from google.genai import types
 
 from backend.utils import load_config
 
@@ -125,3 +129,141 @@ def split_text_by_meaning(text: str, max_length: int = 80) -> List[str]:
             )
             return [text]
     return [text]
+
+
+def convert_pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000) -> bytes:
+    """
+    Converts raw PCM data to WAV format bytes.
+    Gemini TTS returns PCM 24kHz, 1 channel, 16-bit.
+    """
+    with io.BytesIO() as wav_buffer:
+        with wave.open(wav_buffer, "wb") as wf:
+            wf.setnchannels(1)  # Mono
+            wf.setsampwidth(2)  # 16-bit
+            wf.setframerate(sample_rate)
+            wf.writeframes(pcm_data)
+        return wav_buffer.getvalue()
+
+
+def tts_llm(text: str, options: Optional[Dict[str, Any]] = None) -> Optional[bytes]:
+    """
+    Generates speech from text using Gemini TTS model.
+
+    Args:
+        text (str): The text to convert to speech.
+        options (Optional[Dict[str, Any]]): Custom options to override defaults.
+
+    Returns:
+        Optional[bytes]: The generated audio bytes, or None if failed.
+    """
+    config = load_config()
+    tts_config = config.get("tts", {})
+
+    # Merge defaults with user options
+    defaults = tts_config.get("defaults", {})
+    user_options = options or {}
+
+    # language = user_options.get("language", defaults.get("language", "de-DE")) # Not used in API directly yet, but good for future
+    speed = user_options.get(
+        "speed", defaults.get("speed", "Native conversational pace")
+    )
+    tone = user_options.get(
+        "tone", defaults.get("tone", "Clear, educational, engaging")
+    )
+
+    # API Key and Model
+    api_key = (
+        user_options.get("api_key")
+        or os.getenv("TTS_API_KEY")
+        or tts_config.get("api_key")
+    )
+    model_name = user_options.get("model") or tts_config.get(
+        "model", "gemini-2.5-flash-preview-tts"
+    )
+
+    if not api_key:
+        logger.error(
+            "TTS API Key not found. Please set TTS_API_KEY env var or config.yaml."
+        )
+        raise ValueError("TTS API Key not found")
+
+    client = genai.Client(api_key=api_key)
+
+    # Determine Mode (Single vs Multi-speaker)
+    is_multi_speaker = "Redner1" in text and "Redner2" in text
+
+    voice_map = tts_config.get("voice_map", {"male": "Orus", "female": "Kore"})
+    male_voice = voice_map.get("male", "Orus")
+    female_voice = voice_map.get("female", "Kore")
+
+    # Construct Prompt
+    system_instruction = (
+        f"Please read the following German text at a {speed} pace with a {tone} tone.\n"
+    )
+    if is_multi_speaker:
+        system_instruction += "The conversation is between Redner1 and Redner2.\n"
+
+    full_prompt = f"{system_instruction}---\n{text}"
+
+    try:
+        speech_config = None
+        if is_multi_speaker:
+            speech_config = types.SpeechConfig(
+                multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
+                    speaker_voice_configs=[
+                        types.SpeakerVoiceConfig(
+                            speaker="Redner1",
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                    voice_name=male_voice
+                                )
+                            ),
+                        ),
+                        types.SpeakerVoiceConfig(
+                            speaker="Redner2",
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                    voice_name=female_voice
+                                )
+                            ),
+                        ),
+                    ]
+                )
+            )
+        else:
+            # Default single speaker (Male)
+            # Check if user specified voice in options, otherwise use default male
+            voice_name = user_options.get("voice", male_voice)
+            speech_config = types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name=voice_name
+                    )
+                )
+            )
+
+        response = client.models.generate_content(
+            model=model_name,
+            contents=full_prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=speech_config,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    maximum_remote_calls=14
+                ),
+            ),
+        )
+
+        if (
+            response.candidates
+            and response.candidates[0].content
+            and response.candidates[0].content.parts
+        ):
+            part = response.candidates[0].content.parts[0]
+            if part.inline_data and part.inline_data.data:
+                return convert_pcm_to_wav(part.inline_data.data)
+        return None
+
+    except Exception as e:
+        logger.error(f"TTS Generation failed: {e}")
+        raise e
