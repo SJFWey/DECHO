@@ -255,7 +255,7 @@ def convert_text_and_process(task_id: str, temp_text_path: str, original_filenam
         file_path = os.path.join(UPLOAD_DIR, f"{task_id}_{new_filename}")
         shutil.move(generated_audio_path, file_path)
 
-        task.filename = new_filename
+        # task.filename = new_filename # Keep original filename for display
         task.filePath = file_path
         db.commit()
 

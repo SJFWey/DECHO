@@ -528,4 +528,9 @@ def split_sentences(
     logger.info(
         f"NLP splitting complete. {len(segments)} segments -> {len(refined_segments)} segments."
     )
+
+    # Extend the end of each segment by 150ms to avoid abrupt cut-offs
+    for seg in refined_segments:
+        seg["end"] += 0.15
+
     return refined_segments

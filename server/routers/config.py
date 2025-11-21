@@ -40,6 +40,17 @@ async def update_config(config_update: ConfigUpdate):
 
             current_config["llm"].update(update_data)
 
+        if config_update.tts:
+            if "tts" not in current_config:
+                current_config["tts"] = {}
+
+            update_data = config_update.tts.model_dump(exclude_unset=True)
+            # Don't update api_key if it's the masked value
+            if update_data.get("api_key") == "********":
+                del update_data["api_key"]
+
+            current_config["tts"].update(update_data)
+
         if config_update.app:
             current_config["app"].update(
                 config_update.app.model_dump(exclude_unset=True)
@@ -100,3 +111,54 @@ async def test_llm(config_update: ConfigUpdate):
             except:
                 pass
         raise HTTPException(status_code=500, detail=error_detail)
+
+
+@router.post("/test-tts")
+async def test_tts(config_update: ConfigUpdate):
+    """
+    Test the TTS connection with the provided configuration.
+    """
+    try:
+        from backend.llm import tts_llm
+
+        api_key = config_update.tts.api_key if config_update.tts else None
+        # If api_key is masked, try to load from current config
+        if api_key == "********":
+            current_config = load_config()
+            api_key = current_config.get("tts", {}).get("api_key")
+
+        model = config_update.tts.model if config_update.tts else None
+
+        # Use defaults from request or config
+        defaults = config_update.tts.defaults if config_update.tts else None
+
+        options = {
+            "api_key": api_key,
+            "model": model,
+        }
+
+        if defaults:
+            options.update(defaults.model_dump())
+
+        # Test with a short text
+        audio_bytes = tts_llm("Hello, this is a test.", options=options)
+
+        if audio_bytes:
+            return {
+                "status": "success",
+                "message": "Connection successful",
+            }
+        else:
+            raise HTTPException(status_code=500, detail="TTS returned no audio")
+
+    except Exception as e:
+        # Include the actual error message in the response
+        error_detail = str(e)
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_detail += f" - Response: {e.response.text}"
+            except:
+                pass
+        raise HTTPException(
+            status_code=500, detail=f"TTS Connection failed: {error_detail}"
+        )

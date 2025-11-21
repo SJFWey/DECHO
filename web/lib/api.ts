@@ -86,6 +86,14 @@ export const api = {
     return response.data;
   },
 
+  testTTSConfig: async (config: Config) => {
+    const response = await axios.post<{ status: string; message: string }>(
+      `${API_URL.replace('/audio', '/config')}/test-tts`,
+      config
+    );
+    return response.data;
+  },
+
   uploadPracticeRecording: async (taskId: string, segmentIndex: number, file: Blob) => {
     const formData = new FormData();
     formData.append('file', file, 'recording.webm');
@@ -134,10 +142,25 @@ export interface Config {
     base_url?: string;
     model?: string;
   };
+  tts: {
+    api_key?: string;
+    model?: string;
+    defaults: {
+      language: string;
+      speed: string;
+      tone: string;
+    };
+    voice_map: {
+      male: string;
+      female: string;
+    };
+  };
   app: {
     max_split_length: number;
     use_llm: boolean;
+    source_language: string;
     target_language: string;
     spacy_model_map: Record<string, string>;
   };
 }
+

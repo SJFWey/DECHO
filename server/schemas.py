@@ -50,6 +50,24 @@ class LLMConfig(BaseModel):
     model: Optional[str] = None
 
 
+class TTSDefaults(BaseModel):
+    language: str
+    speed: str
+    tone: str
+
+
+class TTSVoiceMap(BaseModel):
+    male: str
+    female: str
+
+
+class TTSConfig(BaseModel):
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    defaults: TTSDefaults
+    voice_map: TTSVoiceMap
+
+
 class AppConfig(BaseModel):
     max_split_length: int
     use_llm: bool
@@ -58,13 +76,23 @@ class AppConfig(BaseModel):
     spacy_model_map: Dict[str, str]
 
 
+class AppConfigUpdate(BaseModel):
+    max_split_length: Optional[int] = None
+    use_llm: Optional[bool] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+    spacy_model_map: Optional[Dict[str, str]] = None
+
+
 class ConfigResponse(BaseModel):
     asr: ASRConfig
     llm: LLMConfig
+    tts: TTSConfig
     app: AppConfig
 
 
 class ConfigUpdate(BaseModel):
     asr: Optional[ASRConfig] = None
     llm: Optional[LLMConfig] = None
-    app: Optional[AppConfig] = None
+    tts: Optional[TTSConfig] = None
+    app: Optional[AppConfigUpdate] = None
