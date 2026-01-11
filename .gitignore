@@ -58,7 +58,12 @@ Thumbs.db
 # Directories to ignore
 input/
 output/
-models/
+docs/
+tests/
+
+# Models directory - keep folder structure but ignore model files
+models/*
+!models/.gitkeep
 
 # Node.js
 node_modules/

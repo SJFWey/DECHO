@@ -1,0 +1,12 @@
+# This directory is for ASR model files
+# 
+# Please download the required model and place it here.
+# See README.md for download instructions.
+#
+# Expected structure:
+# models/
+# └── sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/
+#     ├── decoder.int8.onnx
+#     ├── encoder.int8.onnx
+#     ├── joiner.int8.onnx
+#     └── tokens.txt
