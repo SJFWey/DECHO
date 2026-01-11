@@ -85,9 +85,24 @@ cp .env.example .env
 # Edit .env with your API keys and settings
 ```
 
-### 5. Download ASR Model (Optional)
+### 5. Download ASR Model
 
-The ASR model will be downloaded automatically on first use, or you can manually download it:
+The ASR model needs to be downloaded manually. Download the **Sherpa-ONNX NeMo Parakeet TDT model** from the official repository:
+
+📥 **Download Link:** [sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models)
+
+After downloading, extract and place the model files in the `models/` directory:
+
+```
+models/
+└── sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/
+    ├── decoder.int8.onnx
+    ├── encoder.int8.onnx
+    ├── joiner.int8.onnx
+    └── tokens.txt
+```
+
+Alternatively, you can run the download script:
 
 ```bash
 python scripts/download_models.py

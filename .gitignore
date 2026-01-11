@@ -68,5 +68,12 @@ out/
 # Keep lock files for reproducibility
 # (uv.lock and web/package-lock.json are tracked)
 /package-lock.json
+
+# Build artifacts (large binaries)
 dist/
 build/decho-server/
+*.exe
+*.pkg
+
+# Tauri binaries (too large for Git, download separately)
+web/src-tauri/
