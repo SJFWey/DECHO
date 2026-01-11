@@ -527,6 +527,7 @@ def split_sentences(
 
     # Extend the end of each segment by 150ms to avoid abrupt cut-offs
     for seg in refined_segments:
-        seg["end"] += 0.15
+        seg["end"] += 0.00
+        seg["start"] += 0.15
 
     return refined_segments

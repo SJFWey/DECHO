@@ -1,8 +1,19 @@
 [project]
 name = "decho"
 version = "0.1.0"
-description = "Add your description here"
+description = "A modern language learning tool for listening comprehension and pronunciation practice"
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "DECHO Contributors" }]
+keywords = ["language-learning", "speech-recognition", "tts", "asr", "nlp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
 requires-python = ">=3.13.1"
 dependencies = [
     "numpy>=2.3.5",

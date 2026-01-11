@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Hearing API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="DECHO API", version="1.0.0", lifespan=lifespan)
 
 # CORS configuration
 app.add_middleware(
@@ -85,7 +85,7 @@ else:
 
     @app.get("/")
     async def root():
-        return {"message": "Hearing API is running (Frontend not found)"}
+        return {"message": "DECHO API is running (Frontend not found)"}
 
 
 if __name__ == "__main__":

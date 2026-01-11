@@ -39,10 +39,10 @@ def chat_completion(
 
     # Prioritize argument -> environment variable -> config
     api_key = api_key or os.getenv("LLM_API_KEY") or llm_config.get("api_key")
-    base_url = base_url or llm_config.get("base_url", "https://example-llm-provider.com/v1")
+    base_url = base_url or llm_config.get("base_url")
     if base_url:
         base_url = base_url.rstrip("/")
-    default_model = llm_config.get("model", "openai/gpt-4o")
+    default_model = llm_config.get("model")
 
     if not api_key:
         logger.error(
@@ -50,12 +50,16 @@ def chat_completion(
         )
         raise ValueError("LLM API Key not found")
 
+    if not base_url:
+        logger.error("LLM base_url is missing. Set LLM_BASE_URL or config.yaml.")
+        raise ValueError("LLM base_url not provided")
+
     url = f"{base_url}/chat/completions"
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "http://localhost:8501",  # Localhost for streamlit
-        "X-Title": "Hearing App",
+        "HTTP-Referer": "http://localhost:8000",
+        "X-Title": "DECHO App",
         "Content-Type": "application/json",
     }
 

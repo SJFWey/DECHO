@@ -287,7 +287,8 @@ async def upload_audio(
     db: Session = Depends(get_db),
 ):
     task_id = str(uuid.uuid4())
-    filename = file.filename or "unknown"
+    raw_filename = file.filename or "unknown"
+    filename = os.path.basename(raw_filename)
     ext = os.path.splitext(filename)[1].lower()
 
     if ext in [".txt", ".md"]:

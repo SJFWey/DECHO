@@ -19,7 +19,7 @@ def setup_logging() -> None:
     """
     log_dir = "output/log"
     os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, "hearing.log")
+    log_file = os.path.join(log_dir, "decho.log")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -72,8 +72,8 @@ def load_config(reload: bool = False) -> Dict[str, Any]:
         config = {
             "llm": {
                 "api_key": os.getenv("LLM_API_KEY", ""),
-                "base_url": os.getenv("LLM_BASE_URL", "https://example-llm-provider.com/v1"),
-                "model": os.getenv("LLM_MODEL", "gemini-2.5-flash"),
+                "base_url": os.getenv("LLM_BASE_URL", ""),
+                "model": os.getenv("LLM_MODEL", ""),
             },
             "tts": {
                 "api_key": os.getenv("TTS_API_KEY", ""),

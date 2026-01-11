@@ -1,18 +1,18 @@
-class HearingError(Exception):
-    """Base exception for all Hearing application errors."""
+class DECHOError(Exception):
+    """Base exception for all DECHO application errors."""
 
 
-class AudioConversionError(HearingError):
+class AudioConversionError(DECHOError):
     """Raised when audio conversion fails."""
 
 
-class ASRError(HearingError):
+class ASRError(DECHOError):
     """Raised when ASR transcription fails."""
 
 
-class NLPError(HearingError):
+class NLPError(DECHOError):
     """Raised when NLP processing fails."""
 
 
-class ConfigError(HearingError):
+class ConfigError(DECHOError):
     """Raised when configuration is invalid or missing."""

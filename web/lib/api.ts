@@ -4,10 +4,20 @@ const getBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
+
   if (typeof window !== 'undefined') {
-    // When served by the backend, use relative path
-    return '/api';
+    const { origin, protocol, port } = window.location;
+
+    // Dev server (Next.js on 3000/3001) should hit FastAPI on 8000 directly, even if accessed via LAN IP.
+    if (port === '3000' || port === '3001') {
+      return `${protocol}//127.0.0.1:8000/api`;
+    }
+
+    // When frontend is served by FastAPI (same origin), relative path works
+    return `${origin.replace(/\/$/, '')}/api`;
   }
+
+  // SSR / fallback
   return 'http://127.0.0.1:8000/api';
 };
 

@@ -1,29 +1,72 @@
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.log
-*.tmp
-*.wav
-*.mp3
-.env
-!.env.example
+*.egg-info/
+*.egg
+dist/
+build/
+*.manifest
+*.spec
+
+# Virtual environments
 .venv/
+venv/
+ENV/
+
+# Testing & Coverage
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
-.DS_Store
-Thumbs.db
+htmlcov/
+.tox/
+
+# IDE & Editor
 .idea/
 .vscode/
 .cursor/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project specific
+.env
+!.env.example
+.python-version
+.powershell_profile.ps1
+
+# Generated files
+*.log
+*.tmp
+*.wav
+*.mp3
+**/build_log.txt
+
+# Database
+*.db
+*.sqlite3
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Directories to ignore
 input/
 output/
 models/
-.powershell_profile.ps1
-.python-version
-*.db
-*.sqlite3
-.ipynb_checkpoints/
-/docs
+
+# Node.js
+node_modules/
+.next/
+out/
+
+# Keep lock files for reproducibility
+# (uv.lock and web/package-lock.json are tracked)
+/package-lock.json
+dist/
+build/decho-server/

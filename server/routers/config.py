@@ -1,19 +1,32 @@
+import copy
+
 from fastapi import APIRouter, HTTPException
-from server.schemas import ConfigResponse, ConfigUpdate
-from backend.utils import load_config
+
 from backend.exceptions import ConfigError
+from backend.utils import load_config
+from server.schemas import ConfigResponse, ConfigUpdate
 
 router = APIRouter()
+
+
+def _masked_config(config: dict) -> dict:
+    """Return a copy of the config with secrets redacted."""
+    masked = copy.deepcopy(config)
+
+    if "llm" in masked and "api_key" in masked["llm"]:
+        masked["llm"]["api_key"] = "********" if masked["llm"]["api_key"] else ""
+
+    if "tts" in masked and "api_key" in masked["tts"]:
+        masked["tts"]["api_key"] = "********" if masked["tts"]["api_key"] else ""
+
+    return masked
 
 
 @router.get("/", response_model=ConfigResponse)
 async def get_config():
     try:
         config = load_config()
-        # Mask sensitive information
-        # if "llm" in config and "api_key" in config["llm"]:
-        #     config["llm"]["api_key"] = "********"
-        return config
+        return _masked_config(config)
     except ConfigError as e:
         raise HTTPException(status_code=500, detail=str(e))
 

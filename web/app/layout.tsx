@@ -17,6 +17,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "DECHO",
   description: "AI-powered audio processing",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+  },
 };
 
 import { ApiProvider } from "@/components/providers/api-provider";
