@@ -1,7 +1,7 @@
 # DECHO
 
 <p align="center">
-  <strong>🎧 A language learning tool for listening comprehension and pronunciation practice</strong>
+  <strong>A language learning tool for listening comprehension and pronunciation practice</strong>
 </p>
 
 <p align="center">
@@ -16,17 +16,17 @@
 
 ---
 
-## ✨ Features
+## Features
 
-- **🎤 Speech Recognition (ASR)** - Powered by Sherpa-ONNX with NeMo Parakeet model for accurate transcription
-- **🔊 Text-to-Speech (TTS)** - High-quality audio generation with customizable voices
-- **📝 Intelligent Text Processing** - LLM-powered sentence splitting and analysis
-- **🌍 Multi-language Support** - English, German, Chinese and more via spaCy NLP
-- **📊 Practice Tracking** - Track your progress with detailed statistics
-- **🎯 Interactive Practice Mode** - Listen, repeat, and compare your pronunciation
-- **🌙 Beautiful Dark UI** - Modern "Silent Titanium" design system
+- **Speech Recognition (ASR)** - Powered by Sherpa-ONNX with NeMo Parakeet model for accurate transcription
+- **Text-to-Speech (TTS)** - High-quality audio generation with customizable voices
+- **Intelligent Text Processing** - LLM-powered sentence splitting and analysis
+- **Multi-language Support** - English, German, Chinese and more via spaCy NLP
+- **Practice Tracking** - Track your progress with detailed statistics
+- **Interactive Practice Mode** - Listen, repeat, and compare your pronunciation
+- **Beautiful Dark UI** - Modern "Silent Titanium" design system
 
-## 🖥️ Tech Stack
+## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
@@ -36,13 +36,13 @@
 | **NLP** | spaCy |
 | **Database** | SQLite (via Prisma) |
 
-## 📋 Prerequisites
+## Prerequisites
 
 - **Python 3.13+**
 - **Node.js 18+** & npm
 - **uv** (recommended for Python dependency management) - [Install uv](https://github.com/astral-sh/uv)
 
-## 🚀 Installation
+## Installation
 
 ### 1. Clone the repository
 
@@ -89,7 +89,7 @@ cp .env.example .env
 
 The ASR model needs to be downloaded manually. Download the **Sherpa-ONNX NeMo Parakeet TDT model** from the official repository:
 
-📥 **Download Link:** [sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models)
+**Download Link:** [sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models)
 
 After downloading, extract and place the model files in the `models/` directory:
 
@@ -108,7 +108,7 @@ Alternatively, you can run the download script:
 python scripts/download_models.py
 ```
 
-## 🎯 Usage
+## Usage
 
 ### Development Mode
 
@@ -140,7 +140,7 @@ cd web && npm run build
 uv run uvicorn server.main:app --port 8000
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 All configuration is done via environment variables. See [`.env.example`](.env.example) for all available options.
 
@@ -155,7 +155,7 @@ All configuration is done via environment variables. See [`.env.example`](.env.e
 | `APP_SOURCE_LANGUAGE` | Source language code | `en` |
 | `APP_TARGET_LANGUAGE` | Target language code | `de` |
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 decho/
@@ -177,21 +177,11 @@ decho/
 └── docs/             # Documentation
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) for the ASR engine
 - [NeMo](https://github.com/NVIDIA/NeMo) for the Parakeet model
@@ -200,4 +190,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<p align="center">Made with ❤️ for language learners</p>
+<p align="center">Made with love for language learners</p>

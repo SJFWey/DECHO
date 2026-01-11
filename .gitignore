@@ -70,9 +70,9 @@ node_modules/
 .next/
 out/
 
-# Keep lock files for reproducibility
-# (uv.lock and web/package-lock.json are tracked)
-/package-lock.json
+# Lock files (should be generated locally)
+*.lock
+*-lock.json
 
 # Build artifacts (large binaries)
 dist/
@@ -82,3 +82,22 @@ build/decho-server/
 
 # Tauri binaries (too large for Git, download separately)
 web/src-tauri/
+
+# Next.js/shadcn default template files
+web/public/file.svg
+web/public/globe.svg
+web/public/next.svg
+web/public/vercel.svg
+web/public/window.svg
+web/README.md
+web/components.json
+
+# Prisma (not used in this project)
+web/prisma.config.ts
+web/prisma/
+
+# One-off/utility scripts
+scripts/fix_duration.py
+
+# Contributing guide (personal project)
+CONTRIBUTING.md
